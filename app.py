@@ -5,6 +5,8 @@ import bcrypt
 from components import *
 from fasthtml.common import *
 
+from data.models import db, auth_users, auth_groups, auth_permissions
+
 APP_NAME = "User Auth"
 
 rt = APIRouter(prefix="/auth")
@@ -22,40 +24,6 @@ app = FastHTML(
         Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
     ),
 )
-
-db = database("auth.db")
-
-
-class AuthUsers:
-    id: int
-    uuid: str = uuid4().hex
-    username: str
-    email: str
-    rut: str
-    password_hash: str
-    created_at: int
-    updated_at: int
-    role: int
-
-
-class AuthGroups:
-    id: int
-    name: str = "User"
-
-
-class AuthPermissions:
-    id: int
-    name: str
-    group_id: int
-
-
-roles = db.create(AuthGroups, pk="id", transform=True, not_null={"name"})
-roles.upsert(id=1, name="Admin")
-roles.upsert(id=2, name="User")
-users = db.create(
-    AuthUsers, pk="email", transform=True, not_null={"uuid"}, defaults=dict(role=2)
-)
-permissions = db.create(AuthPermissions, pk="id", transform=True)
 
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
@@ -342,7 +310,9 @@ def register_user(
 
     try:
         # Verificar si ya existe el usuario
-        exists = users("email=?", (email,)) or users("username=?", (username,))
+        exists = auth_users("email=?", (email,)) or auth_users(
+            "username=?", (username,)
+        )
 
         if len(exists):
             return (
@@ -354,7 +324,7 @@ def register_user(
         password_hash = get_password_hash(password)
         import time
 
-        users.insert(
+        auth_users.insert(
             uuid=uuid4().hex,
             username=username or None,
             email=email,
@@ -390,7 +360,7 @@ def login(session, email: str, password: str, important: str = ""):
         print(f"verificando {email} en users")
 
         try:
-            exist_user = users[email]
+            exist_user = auth_users[email]
         except NotFoundError:
             return ergonoti(
                 message="Credenciales desconocidas", type="error"
@@ -400,8 +370,10 @@ def login(session, email: str, password: str, important: str = ""):
             print(f"Error al buscar el usuario: {e}")
         else:
             print("verificando password")
-            if exist_user and verify_password(password, users[email].password_hash):
-                session["auth"] = {"user_id": users[email].id, "email": email}
+            if exist_user and verify_password(
+                password, auth_users[email].password_hash
+            ):
+                session["auth"] = {"user_id": auth_users[email].id, "email": email}
                 return Redirect(ROUTE_AFTER_LOGIN)
             else:
                 return ergonoti(
@@ -437,7 +409,7 @@ def user_update(
     # Obtener el usuario actual
     # user = db.q("select * from users where id = ?", (user_id,))[0]
 
-    user = users("id=?", (user_pk,))[0]
+    user = auth_users("id=?", (user_pk,))[0]
     if not user:
         print(session, "Usuario no encontrado", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
