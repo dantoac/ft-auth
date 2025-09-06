@@ -7,14 +7,18 @@ APP_NAME = "User Auth"
 
 rt = APIRouter(prefix="/auth")
 
-app = FastHTML(title=APP_NAME, theme="dark", favicon="favicon.ico",
-               hdrs=(
-                   Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
-                   Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4")
-               )
-               )
+app = FastHTML(
+    title=APP_NAME,
+    theme="dark",
+    favicon="favicon.ico",
+    hdrs=(
+        Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
+        Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
+    ),
+)
 
 db = database("auth.db")
+
 
 class Users:
     id: int
@@ -23,7 +27,9 @@ class Users:
     rut: str
     password_hash: str
 
+
 users = db.create(Users, pk="email", transform=True)
+
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
     if not all([plain_password, hashed_password]):
@@ -133,7 +139,6 @@ def user_update_form():
 
 def login_form():
     return Div(
-
         Form(
             H1(
                 I(_class="fas fa-user-circle mr-2"),
@@ -165,7 +170,7 @@ def login_form():
             ),
             Div(
                 A("Crear cuenta", href="/auth/register", _class="link link-primary"),
-                _class="w-full text-right mt-2"
+                _class="w-full text-right mt-2",
             ),
             Button(
                 I(_class="fas fa-user-circle", _onclick="return false;"),
@@ -249,12 +254,16 @@ def register_form():
                 id="important",
                 type="hidden",
                 value="",
-                name="important", #this is just to catch IA spambots crawling forms
+                name="important",  # this is just to catch IA spambots crawling forms
                 placeholder="very important value please write something",
             ),
             Div(
-                A("¿Ya tienes cuenta? Inicia sesión", href="/auth", _class="link link-primary"),
-                _class="w-full text-right mt-2"
+                A(
+                    "¿Ya tienes cuenta? Inicia sesión",
+                    href="/auth",
+                    _class="link link-primary",
+                ),
+                _class="w-full text-right mt-2",
             ),
             Button(
                 I(_class="fas fa-user-plus", _onclick="return false;"),
@@ -277,6 +286,7 @@ def index():
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
+
 @rt
 def register():
     """Muestra el formulario de registro."""
@@ -296,10 +306,6 @@ def register_user(
     # Evitar bots por honeypot
     if len(important):
         return
-
-    # Limpiar toasts previos
-    if session.get("toasts"):
-        del session["toasts"]
 
     # Validaciones básicas
     if not (len(username) and len(password) and len(confirm_password)):
@@ -328,14 +334,18 @@ def register_user(
 
         # Insertar nuevo usuario
         password_hash = get_password_hash(password)
-        users.insert(username=username, email=email or None, rut=rut or None, password_hash=password_hash)
+        users.insert(
+            username=username,
+            email=email or None,
+            rut=rut or None,
+            password_hash=password_hash,
+        )
     except Exception as e:
         return (
             ergonoti(message=f"Error al registrar usuario: {str(e)}", type="error"),
             register_form(),
         )
 
-    add_toast(session, f"Usuario '{username}' creado correctamente", "success")
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
@@ -368,8 +378,7 @@ def login(session, email: str, password: str, important: str = ""):
         else:
             print("verificando password")
             if exist_user and verify_password(password, users[email].password_hash):
-                session["auth"] = {"user_id": users[email].id, "name": email}
-                add_toast(session, f"Sesión iniciada como {email}", "success")
+                session["auth"] = {"user_id": users[email].id, "email": email}
                 return Redirect(ROUTE_AFTER_LOGIN)
             else:
                 return ergonoti(
@@ -379,7 +388,7 @@ def login(session, email: str, password: str, important: str = ""):
 
 @rt
 def profile():
-    return user_update_form()
+    return user_template(user_update_form())
 
 
 @rt.post
@@ -400,22 +409,19 @@ def user_update(
         print(session, "Debe iniciar sesión", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
 
-    user_id = session["auth"]["user_id"]
-
+    user_pk = session["auth"]["user_id"]
+    print(session, user_pk)
     # Obtener el usuario actual
     # user = db.q("select * from users where id = ?", (user_id,))[0]
-    users_tbl = db.t["users"]
-    user = users_tbl("id=?", (user_id,))[0]
+
+    user = users("id=?", (user_pk,))[0]
     if not user:
         print(session, "Usuario no encontrado", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
 
-    user_name = user.username
-    user_password_hash = user.password_hash
-
     # Verificar la contraseña actual si se proporcionó
     if current_password:
-        if not verify_password(current_password, user_password_hash):
+        if not verify_password(current_password, user.user_password_hash):
             print("Contraseña actual incorrecta", "error")
             return user_update_form(), ergonoti(
                 message="Contraseña actual incorrecta", type="error"
@@ -431,7 +437,7 @@ def user_update(
 
                 # Guardar los cambios
                 try:
-                    users_tbl.update(username=user_name, password_hash=new_password_hash)
+                    users_tbl.update(email=user.email, password_hash=new_password_hash)
                 except Exception as e:
                     db.rollback()
                     print(session, f"Error al actualizar usuario: {str(e)}", "error")
@@ -456,9 +462,11 @@ def user_template(content):
         _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800",
     )
 
+
 ROUTE_AFTER_LOGIN = rt.rt_funcs.profile
 ROUTE_AFTER_REGISTER = rt.rt_funcs.index
 ROUTE_AFTER_LOGOUT = rt.rt_funcs.index
+ROUTE_AFTER_UPDATE = rt.rt_funcs.profile
 
 rt.to_app(app)
 serve(port=8000)
