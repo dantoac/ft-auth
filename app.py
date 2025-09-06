@@ -13,6 +13,7 @@ app = FastHTML(
     favicon="favicon.ico",
     hdrs=(
         Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
+        Link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"),
         Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
     ),
 )
@@ -52,10 +53,10 @@ def logout(session):
         return Redirect(ROUTE_AFTER_LOGOUT)
 
 
-def user_update_form():
+def user_update_form(session):
     return Form(
         H2(
-            "Actualizar datos de usuario",
+            f"Actualizando datos de {session['auth']['email']}",
             _class="text-xl font-bold mb-4",
         ),
         Div(
@@ -190,17 +191,6 @@ def login_form():
 
 def register_form():
     return Div(
-        Div(cls="text-center mb-8")(
-            Span(
-                I(_class="fa fa-solid fa-user-plus"),
-                "Crear cuenta",
-                cls="text-md text-wrap xl:text-2xl md:text-3xl xl:text-5xl font-bold text-slate-600 dark:text-white mb-2",
-            ),
-            P(
-                "Complete el formulario para registrarse",
-                cls="text-md lg:text-lg opacity-70 text-slate-400",
-            ),
-        ),
         Form(
             H1(
                 I(_class="fas fa-user-plus mr-2"),
@@ -210,7 +200,7 @@ def register_form():
             Input(
                 id="username",
                 name="username",
-                placeholder="Usuario",
+                placeholder="Usuario (opcional)",
                 autocomplete="off",
                 type="text",
                 _class="input input-bordered w-full max-w-xs",
@@ -219,6 +209,7 @@ def register_form():
             Input(
                 id="email",
                 name="email",
+                required=True,
                 placeholder="Correo electrónico",
                 autocomplete="off",
                 type="email",
@@ -260,7 +251,7 @@ def register_form():
             Div(
                 A(
                     "¿Ya tienes cuenta? Inicia sesión",
-                    href="/auth",
+                    href=index,
                     _class="link link-primary",
                 ),
                 _class="w-full text-right mt-2",
@@ -281,7 +272,7 @@ def register_form():
     )
 
 
-@rt
+@rt.get("/login")
 def index():
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
@@ -387,8 +378,8 @@ def login(session, email: str, password: str, important: str = ""):
 
 
 @rt
-def profile():
-    return user_template(user_update_form())
+def profile(session):
+    return user_template(user_update_form(session))
 
 
 @rt.post
