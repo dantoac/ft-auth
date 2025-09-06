@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import bcrypt
 
 from components import *
@@ -23,14 +25,32 @@ db = database("auth.db")
 
 class Users:
     id: int
+    uuid: str = uuid4().hex
     username: str
     email: str
     rut: str
     password_hash: str
+    created_at: int
+    updated_at: int
+    role: int
 
 
-users = db.create(Users, pk="email", transform=True)
 
+class Roles:
+    id: int
+    name: str = 'User'
+
+class Permissions:
+    id: int
+    name: str
+    role_id: int
+
+
+roles = db.create(Roles, pk="id", transform=True, not_null={'name'})
+roles.upsert(id=1, name='Admin')
+roles.upsert(id=2, name='User')
+users = db.create(Users, pk="email", transform=True, not_null={'uuid'}, defaults=dict(role=2))
+permissions = db.create(Permissions, pk="id", transform=True)
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
     if not all([plain_password, hashed_password]):
@@ -170,7 +190,7 @@ def login_form():
                 placeholder="very important value please write something",
             ),
             Div(
-                A("Crear cuenta", href="/auth/register", _class="link link-primary"),
+                A("Crear cuenta", href=register, _class="link link-primary"),
                 _class="w-full text-right mt-2",
             ),
             Button(
@@ -299,7 +319,7 @@ def register_user(
         return
 
     # Validaciones básicas
-    if not (len(username) and len(password) and len(confirm_password)):
+    if not (len(email) and len(password) and len(confirm_password)):
         return (
             ergonoti(message="Debe completar los campos obligatorios", type="warning"),
             register_form(),
@@ -316,7 +336,8 @@ def register_user(
 
     try:
         # Verificar si ya existe el usuario
-        exists = users("username=?", (username,))
+        exists = users("email=?", (email,)) or users("username=?", (username,))
+
         if len(exists):
             return (
                 ergonoti(message="El usuario ya existe", type="error"),
@@ -325,11 +346,15 @@ def register_user(
 
         # Insertar nuevo usuario
         password_hash = get_password_hash(password)
+        import time
         users.insert(
-            username=username,
-            email=email or None,
+            uuid=uuid4().hex,
+            username=username or None,
+            email=email,
             rut=rut or None,
             password_hash=password_hash,
+            created_at=int(time.time()),
+            updated_at=int(time.time()),
         )
     except Exception as e:
         return (
