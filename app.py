@@ -26,7 +26,7 @@ app = FastHTML(
 db = database("auth.db")
 
 
-class Users:
+class AuthUsers:
     id: int
     uuid: str = uuid4().hex
     username: str
@@ -38,24 +38,24 @@ class Users:
     role: int
 
 
-class UserGroups:
+class AuthGroups:
     id: int
     name: str = "User"
 
 
-class Authorizations:
+class AuthPermissions:
     id: int
     name: str
     group_id: int
 
 
-roles = db.create(UserGroups, pk="id", transform=True, not_null={"name"})
+roles = db.create(AuthGroups, pk="id", transform=True, not_null={"name"})
 roles.upsert(id=1, name="Admin")
 roles.upsert(id=2, name="User")
 users = db.create(
-    Users, pk="email", transform=True, not_null={"uuid"}, defaults=dict(role=2)
+    AuthUsers, pk="email", transform=True, not_null={"uuid"}, defaults=dict(role=2)
 )
-permissions = db.create(Authorizations, pk="id", transform=True)
+permissions = db.create(AuthPermissions, pk="id", transform=True)
 
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
