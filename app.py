@@ -6,8 +6,16 @@ from fasthtml.common import *
 APP_NAME = "User Auth"
 
 rt = APIRouter(prefix="/auth")
-app = FastHTML(title=APP_NAME, theme="dark", favicon="favicon.ico")
+
+app = FastHTML(title=APP_NAME, theme="dark", favicon="favicon.ico",
+               hdrs=(
+                   Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
+                   Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4")
+               )
+               )
+
 db = database("auth.db")
+
 class Users:
     id: int
     username: str
@@ -15,7 +23,7 @@ class Users:
     rut: str
     password_hash: str
 
-users = db.create(Users)
+users = db.create(Users, pk="email", transform=True)
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
     if not all([plain_password, hashed_password]):
@@ -33,12 +41,12 @@ def get_password_hash(password: str) -> str:
 def logout(session):
     try:
         del session["auth"]
-        return Redirect("/")
+        return Redirect(ROUTE_AFTER_LOGOUT)
     except KeyError:
-        return Redirect("/auth/login")
+        return Redirect(ROUTE_AFTER_LOGOUT)
 
 
-def user_profile_form():
+def user_update_form():
     return Form(
         H2(
             "Actualizar datos de usuario",
@@ -125,17 +133,7 @@ def user_profile_form():
 
 def login_form():
     return Div(
-        Div(cls="text-center mb-8")(
-            Span(
-                I(_class="fa fa-solid fa-camera"),
-                "Archivo Gala 4MB 2025",
-                cls="text-md text-wrap xl:text-2xl md:text-3xl xl:text-5xl font-bold text-slate-600 dark:text-white mb-2",
-            ),
-            P(
-                "Más info en el Whatsapp de apoderados",
-                cls="text-md lg:text-lg opacity-70 text-slate-400",
-            ),
-        ),
+
         Form(
             H1(
                 I(_class="fas fa-user-circle mr-2"),
@@ -143,9 +141,9 @@ def login_form():
                 _class="text-2xl font-bold mb-4",
             ),
             Input(
-                id="nombre",
-                name="nombre",
-                placeholder="nombre",
+                id="email",
+                name="email",
+                placeholder="email",
                 autocomplete="off",
                 type="text",
                 _class="input input-bordered w-full max-w-xs",
@@ -165,6 +163,10 @@ def login_form():
                 name="important",
                 placeholder="very important value please write something",
             ),
+            Div(
+                A("Crear cuenta", href="/auth/register", _class="link link-primary"),
+                _class="w-full text-right mt-2"
+            ),
             Button(
                 I(_class="fas fa-user-circle", _onclick="return false;"),
                 "Entrar",
@@ -181,33 +183,183 @@ def login_form():
     )
 
 
+def register_form():
+    return Div(
+        Div(cls="text-center mb-8")(
+            Span(
+                I(_class="fa fa-solid fa-user-plus"),
+                "Crear cuenta",
+                cls="text-md text-wrap xl:text-2xl md:text-3xl xl:text-5xl font-bold text-slate-600 dark:text-white mb-2",
+            ),
+            P(
+                "Complete el formulario para registrarse",
+                cls="text-md lg:text-lg opacity-70 text-slate-400",
+            ),
+        ),
+        Form(
+            H1(
+                I(_class="fas fa-user-plus mr-2"),
+                "Registro",
+                _class="text-2xl font-bold mb-4",
+            ),
+            Input(
+                id="username",
+                name="username",
+                placeholder="Usuario",
+                autocomplete="off",
+                type="text",
+                _class="input input-bordered w-full max-w-xs",
+                required=True,
+            ),
+            Input(
+                id="email",
+                name="email",
+                placeholder="Correo electrónico",
+                autocomplete="off",
+                type="email",
+                _class="input input-bordered w-full max-w-xs",
+            ),
+            Input(
+                id="rut",
+                name="rut",
+                placeholder="RUT (opcional)",
+                autocomplete="off",
+                type="text",
+                _class="input input-bordered w-full max-w-xs",
+            ),
+            Input(
+                id="password",
+                name="password",
+                type="password",
+                autocomplete="off",
+                placeholder="Contraseña",
+                _class="input input-bordered w-full max-w-xs",
+                required=True,
+            ),
+            Input(
+                id="confirm_password",
+                name="confirm_password",
+                type="password",
+                autocomplete="off",
+                placeholder="Confirmar contraseña",
+                _class="input input-bordered w-full max-w-xs",
+                required=True,
+            ),
+            Input(
+                id="important",
+                type="hidden",
+                value="",
+                name="important", #this is just to catch IA spambots crawling forms
+                placeholder="very important value please write something",
+            ),
+            Div(
+                A("¿Ya tienes cuenta? Inicia sesión", href="/auth", _class="link link-primary"),
+                _class="w-full text-right mt-2"
+            ),
+            Button(
+                I(_class="fas fa-user-plus", _onclick="return false;"),
+                "Crear cuenta",
+                _class="btn btn-primary w-full mt-4",
+                _hx_trigger="click",
+                _hx_post=register_user,
+            ),
+            _class="flex flex-col items-center gap-4 p-8 bg-slate-300 rounded-lg shadow-inner shadow-slate-900",
+            _hx_swap="outerHTML",
+            _hx_target="#register-form",
+        ),
+        _class="flex flex-col justify-center items-center h-full w-full select-none",
+        _id="register-form",
+    )
+
+
 @rt
 def index():
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
-    #return "aoeuaoeu"
+
+@rt
+def register():
+    """Muestra el formulario de registro."""
+    return user_template(register_form())
 
 
 @rt.post
-def login(session, nombre: str, password: str, important: str = ""):
+def register_user(
+    session,
+    username: str = "",
+    email: str = "",
+    rut: str = "",
+    password: str = "",
+    confirm_password: str = "",
+    important: str = "",
+):
+    # Evitar bots por honeypot
+    if len(important):
+        return
+
+    # Limpiar toasts previos
+    if session.get("toasts"):
+        del session["toasts"]
+
+    # Validaciones básicas
+    if not (len(username) and len(password) and len(confirm_password)):
+        return (
+            ergonoti(message="Debe completar los campos obligatorios", type="warning"),
+            register_form(),
+        )
+
+    if password != confirm_password:
+        return (
+            ergonoti(message="Las contraseñas no coinciden", type="error"),
+            register_form(),
+        )
+
+    # Normalizar username simple
+    username = username.strip()
+
+    try:
+        # Verificar si ya existe el usuario
+        exists = users("username=?", (username,))
+        if len(exists):
+            return (
+                ergonoti(message="El usuario ya existe", type="error"),
+                register_form(),
+            )
+
+        # Insertar nuevo usuario
+        password_hash = get_password_hash(password)
+        users.insert(username=username, email=email or None, rut=rut or None, password_hash=password_hash)
+    except Exception as e:
+        return (
+            ergonoti(message=f"Error al registrar usuario: {str(e)}", type="error"),
+            register_form(),
+        )
+
+    add_toast(session, f"Usuario '{username}' creado correctamente", "success")
+    return Redirect(ROUTE_AFTER_REGISTER)
+
+
+@rt.post
+def login(session, email: str, password: str, important: str = ""):
     # si algún script/bot/ia llena el input "important" retorna vacío
     if len(important):
         return
-    print(session)
-    if session.get("toasts"):
-        del session["toasts"]
-    if not (len(nombre) and len(password)):
-        return toast_notification(
+
+    if session.get("auth"):
+        return Redirect(logout)
+
+    if not (len(email) and len(password)):
+        return ergonoti(
             message="Debe completar el formulario", type="warning"
         ), login_form()
 
     else:
-        print(f"verificando nombre {nombre} en alumnos")
+        print(f"verificando {email} en users")
 
         try:
-            exist_alumno = alumno[nombre]
+            exist_user = users[email]
         except NotFoundError:
-            return toast_notification(
+            return ergonoti(
                 message="Credenciales desconocidas", type="error"
             ), login_form()
 
@@ -215,19 +367,19 @@ def login(session, nombre: str, password: str, important: str = ""):
             print(f"Error al buscar el usuario: {e}")
         else:
             print("verificando password")
-            if exist_alumno and verify_password(password, alumno[nombre].password_hash):
-                session["auth"] = {"alumno_id": alumno[nombre].id, "name": nombre}
-                add_toast(session, f"Sesión iniciada como {nombre}", "success")
-                return Redirect("/")
+            if exist_user and verify_password(password, users[email].password_hash):
+                session["auth"] = {"user_id": users[email].id, "name": email}
+                add_toast(session, f"Sesión iniciada como {email}", "success")
+                return Redirect(ROUTE_AFTER_LOGIN)
             else:
-                return toast_notification(
+                return ergonoti(
                     message="Credenciales desconocidas", type="error"
                 ), login_form()
 
 
 @rt
 def profile():
-    return user_profile_form()
+    return user_update_form()
 
 
 @rt.post
@@ -246,32 +398,32 @@ def user_update(
     # Asegurarse de que el usuario esté autenticado
     if "auth" not in session:
         print(session, "Debe iniciar sesión", "error")
-        return Redirect(login)
+        return Redirect(ROUTE_AFTER_LOGOUT)
 
-    alumno_id = session["auth"]["alumno_id"]
+    user_id = session["auth"]["user_id"]
 
     # Obtener el usuario actual
-    # alumno = db.q("select * from alumno where id = ?", (alumno_id,))[0]
-    alumnos = db.t["alumno"]
-    alumno = alumnos("id=?", (alumno_id,))[0]
-    if not alumno:
+    # user = db.q("select * from users where id = ?", (user_id,))[0]
+    users_tbl = db.t["users"]
+    user = users_tbl("id=?", (user_id,))[0]
+    if not user:
         print(session, "Usuario no encontrado", "error")
-        return Redirect(login)
+        return Redirect(ROUTE_AFTER_LOGOUT)
 
-    user_name = alumno.nombre
-    user_password_hash = alumno.password_hash
+    user_name = user.username
+    user_password_hash = user.password_hash
 
     # Verificar la contraseña actual si se proporcionó
     if current_password:
         if not verify_password(current_password, user_password_hash):
             print("Contraseña actual incorrecta", "error")
-            return user_profile_form(), toast_notification(
+            return user_update_form(), ergonoti(
                 message="Contraseña actual incorrecta", type="error"
             )
         # Actualizar la contraseña si se proporcionó una nueva y se confirmó
         elif len(new_password):
             if new_password != confirm_password:
-                return user_profile_form(), toast_notification(
+                return user_update_form(), ergonoti(
                     message="Las contraseñas no coinciden", type="error"
                 )
             else:
@@ -279,19 +431,19 @@ def user_update(
 
                 # Guardar los cambios
                 try:
-                    alumnos.update(nombre=user_name, password_hash=new_password_hash)
+                    users_tbl.update(username=user_name, password_hash=new_password_hash)
                 except Exception as e:
                     db.rollback()
                     print(session, f"Error al actualizar usuario: {str(e)}", "error")
                 else:
                     print(session, "Contraseña actualizada correctamente", "success")
 
-                    return user_profile_form(), toast_notification(
+                    return user_update_form(), ergonoti(
                         message="Contraseña actualizada correctamente", type="success"
                     )
 
         else:
-            return user_profile_form(), toast_notification(
+            return user_update_form(), ergonoti(
                 message="La nueva contraseña no puede estar vacía", type="error"
             )
 
@@ -304,7 +456,9 @@ def user_template(content):
         _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800",
     )
 
-
+ROUTE_AFTER_LOGIN = rt.rt_funcs.profile
+ROUTE_AFTER_REGISTER = rt.rt_funcs.index
+ROUTE_AFTER_LOGOUT = rt.rt_funcs.index
 
 rt.to_app(app)
 serve(port=8000)
