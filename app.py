@@ -15,7 +15,10 @@ app = FastHTML(
     favicon="favicon.ico",
     hdrs=(
         Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
-        Link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"),
+        Link(
+            rel="stylesheet",
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css",
+        ),
         Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
     ),
 )
@@ -35,10 +38,10 @@ class Users:
     role: int
 
 
-
 class Roles:
     id: int
-    name: str = 'User'
+    name: str = "User"
+
 
 class Permissions:
     id: int
@@ -46,11 +49,14 @@ class Permissions:
     role_id: int
 
 
-roles = db.create(Roles, pk="id", transform=True, not_null={'name'})
-roles.upsert(id=1, name='Admin')
-roles.upsert(id=2, name='User')
-users = db.create(Users, pk="email", transform=True, not_null={'uuid'}, defaults=dict(role=2))
+roles = db.create(Roles, pk="id", transform=True, not_null={"name"})
+roles.upsert(id=1, name="Admin")
+roles.upsert(id=2, name="User")
+users = db.create(
+    Users, pk="email", transform=True, not_null={"uuid"}, defaults=dict(role=2)
+)
 permissions = db.create(Permissions, pk="id", transform=True)
+
 
 def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
     if not all([plain_password, hashed_password]):
@@ -347,6 +353,7 @@ def register_user(
         # Insertar nuevo usuario
         password_hash = get_password_hash(password)
         import time
+
         users.insert(
             uuid=uuid4().hex,
             username=username or None,
