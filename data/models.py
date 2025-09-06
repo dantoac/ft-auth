@@ -1,6 +1,6 @@
 from fasthtml.common import database
 
-db = database("auth.db")
+db = database("data/database.sqlite")
 
 
 class AuthUsers:
