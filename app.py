@@ -5,7 +5,7 @@ import bcrypt
 from components import *
 from fasthtml.common import *
 
-from data.models import db, auth_users, auth_groups, auth_permissions
+from auth.data.models import db, auth_users, auth_groups, auth_permissions
 
 APP_NAME = "User Auth"
 
