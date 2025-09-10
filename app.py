@@ -27,7 +27,7 @@ beforeware = Beforeware(
         r".*\.woff2",
         r".*\.js",
         r"/auth/index",
-        r"/auth",
+        r"/auth/",
         r"/auth/login",
         r"/auth/register",
     ],
