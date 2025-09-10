@@ -11,8 +11,31 @@ APP_NAME = "User Auth"
 
 rt = APIRouter(prefix="/auth")
 
+
+def requires_login(request, session):
+    auth = request.scope["auth"] = session.get("auth", None)
+    if not auth:
+        return Redirect("/auth")
+    return None
+
+
+beforeware = Beforeware(
+    requires_login,
+    skip=[
+        r"/favicon\.ico",
+        r".*\.css",
+        r".*\.woff2",
+        r".*\.js",
+        r"/auth/index",
+        r"/auth",
+        r"/auth/login",
+        r"/auth/register",
+    ],
+)
+
 app = FastHTML(
     title=APP_NAME,
+    #before=beforeware,
     theme="dark",
     favicon="favicon.ico",
     hdrs=(
@@ -183,6 +206,13 @@ def login_form():
     )
 
 
+@rt
+@rt.get("/login")
+def index():
+    """Muestra el formulario de inicio de sesión."""
+    return user_template(login_form())
+
+
 def register_form():
     return Div(
         Form(
@@ -207,14 +237,6 @@ def register_form():
                 placeholder="Correo electrónico",
                 autocomplete="off",
                 type="email",
-                _class="input input-bordered w-full max-w-xs",
-            ),
-            Input(
-                id="rut",
-                name="rut",
-                placeholder="RUT (opcional)",
-                autocomplete="off",
-                type="text",
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -266,12 +288,6 @@ def register_form():
     )
 
 
-@rt.get("/login")
-def index():
-    """Muestra el formulario de inicio de sesión."""
-    return user_template(login_form())
-
-
 @rt
 def register():
     """Muestra el formulario de registro."""
@@ -280,10 +296,8 @@ def register():
 
 @rt.post
 def register_user(
-    session,
     username: str = "",
     email: str = "",
-    rut: str = "",
     password: str = "",
     confirm_password: str = "",
     important: str = "",
@@ -325,10 +339,8 @@ def register_user(
         import time
 
         auth_users.insert(
-            uuid=uuid4().hex,
             username=username or None,
             email=email,
-            rut=rut or None,
             password_hash=password_hash,
             created_at=int(time.time()),
             updated_at=int(time.time()),
@@ -338,7 +350,7 @@ def register_user(
             ergonoti(message=f"Error al registrar usuario: {str(e)}", type="error"),
             register_form(),
         )
-
+    print (f"redireccionando hacia {ROUTE_AFTER_REGISTER}")
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
@@ -361,6 +373,7 @@ def login(session, email: str, password: str, important: str = ""):
 
         try:
             exist_user = auth_users[email]
+            print ("existe", exist_user)
         except NotFoundError:
             return ergonoti(
                 message="Credenciales desconocidas", type="error"

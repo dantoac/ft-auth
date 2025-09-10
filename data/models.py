@@ -1,3 +1,5 @@
+import uuid
+
 from fasthtml.common import database
 
 db = database("data/database.sqlite")
@@ -8,7 +10,22 @@ db = database("data/database.sqlite")
 # ====================================================================
 
 
-class AuthUser:
+class BaseModel:
+    """Modelo base para todas las tablas."""
+    created_at: int
+    updated_at: int
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Fusiona anotaciones heredadas en la subclase para que Fastlite las vea
+        merged = {}
+        for base in cls.__mro__[1:]:
+            merged.update(getattr(base, "__annotations__", {}) or {})
+        own = getattr(cls, "__annotations__", {}) or {}
+        cls.__annotations__ = {**merged, **own}
+
+
+class AuthUser(BaseModel):
     """Usuario del sistema - identidad básica para login."""
 
     id: int
@@ -18,20 +35,19 @@ class AuthUser:
     first_name:str | None
     last_name:str | None
     is_active: bool
-    created_at:int | None  # Unix timestamp
     last_login:int | None  # Unix timestamp
 
 
 auth_users = db.create(
     AuthUser,
-    pk="id",
+    pk="email",
     transform=True,
     not_null={"username", "email", "password_hash", "is_active"},
     defaults={"is_active": True},
 )
 
 
-class AuthGroup:
+class AuthGroup(BaseModel):
     """Grupos de usuarios para autorización (roles amplios)."""
 
     id: int
@@ -49,25 +65,25 @@ auth_groups = db.create(
 )
 
 
-class AuthMembership:
+class AuthMembership(BaseModel):
     """Tabla de paso: asignación de usuarios a grupos."""
 
-    id: int
-    user_id: int
-    group_id: int
+    uuid: str
+    auth_user: str
+    auth_group: int
     assigned_at:int | None  # Unix timestamp
 
 
 auth_memberships = db.create(
     AuthMembership,
-    pk="id",
+    pk="uuid",
+    foreign_keys=[("auth_user", "auth_user"), ("auth_group", "auth_group")],
     transform=True,
-    not_null={"user_id", "group_id"},
-    foreign_keys=["auth_user_id", "auth_group_id"],
+    not_null={"auth_user", "auth_group"},
 )
 
 
-class AuthPermissions:
+class AuthPermissions(BaseModel):
     uuid: str
     name: str
     group_id: int
