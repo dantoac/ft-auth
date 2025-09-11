@@ -1,11 +1,8 @@
-from uuid import uuid4
-
 import bcrypt
-
-from components import *
 from fasthtml.common import *
 
-from auth.data.models import db, auth_users, auth_groups, auth_permissions
+from auth.data.models import db, auth_users
+from .components import ergonoti
 
 APP_NAME = "User Auth"
 
@@ -30,20 +27,17 @@ beforeware = Beforeware(
         r"/auth/",
         r"/auth/login",
         r"/auth/register",
+        r"/auth/register_user",
     ],
 )
 
 app = FastHTML(
     title=APP_NAME,
-    #before=beforeware,
+    before=beforeware,
     theme="dark",
     favicon="favicon.ico",
     hdrs=(
         Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
-        Link(
-            rel="stylesheet",
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css",
-        ),
         Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
     ),
 )
@@ -302,6 +296,7 @@ def register_user(
     confirm_password: str = "",
     important: str = "",
 ):
+
     # Evitar bots por honeypot
     if len(important):
         return

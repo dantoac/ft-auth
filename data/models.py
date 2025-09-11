@@ -1,9 +1,6 @@
-import uuid
 
-from fasthtml.common import database
 
-db = database("data/database.sqlite")
-
+from data.models import db
 
 # ====================================================================
 # MÓDULO DE AUTENTICACIÓN/AUTORIZACIÓN REUTILIZABLE
