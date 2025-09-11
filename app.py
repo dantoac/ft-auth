@@ -200,9 +200,10 @@ def login_form():
     )
 
 
-@rt
-@rt.get("/login")
-def index():
+@rt.get
+@rt.get("/index")
+@rt.get("/")
+def login():
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
@@ -261,7 +262,7 @@ def register_form():
             Div(
                 A(
                     "¿Ya tienes cuenta? Inicia sesión",
-                    href=index,
+                    href=login,
                     _class="link link-primary",
                 ),
                 _class="w-full text-right mt-2",
@@ -440,6 +441,7 @@ def user_update(
 
                 # Guardar los cambios
                 try:
+                    users_tbl = db.t["auth_user"]
                     users_tbl.update(email=user.email, password_hash=new_password_hash)
                 except Exception as e:
                     db.rollback()
@@ -466,9 +468,9 @@ def user_template(content):
     )
 
 
-ROUTE_AFTER_LOGIN = rt.rt_funcs.profile
-ROUTE_AFTER_REGISTER = rt.rt_funcs.index
-ROUTE_AFTER_LOGOUT = rt.rt_funcs.index
+ROUTE_AFTER_LOGIN = "/"
+ROUTE_AFTER_REGISTER = rt.rt_funcs.login
+ROUTE_AFTER_LOGOUT = rt.rt_funcs.login
 ROUTE_AFTER_UPDATE = rt.rt_funcs.profile
 
 rt.to_app(app)
