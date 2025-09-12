@@ -374,17 +374,18 @@ def login(session, email: str, password: str, important: str = ""):
     else:
         print(f"verificando {email} en users")
 
-        user_exists = _get_user_by_email(email)
+        existing_user = _get_user_by_email(email)
 
-        if user_exists and verify_password(password, user_exists.password_hash):
+        if existing_user and verify_password(password, existing_user.password_hash):
             session["auth"] = {
-                "user_id": user_exists.uuid,
-                "email": email,
-                "uuid": user_exists.uuid,
+                "user_id": existing_user.id,
+                "email": existing_user.email,
+                "uuid": existing_user.uuid,
             }
-            import time
 
-            user_exists.last_login = int(time.time())
+            existing_user.last_login = int(time.time())
+            db['auth_user'].update(existing_user)
+
             return Redirect(ROUTE_AFTER_LOGIN)
         else:
             return (
@@ -426,12 +427,7 @@ def user_update(
         print(session, "Debe iniciar sesión", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
 
-    user_pk = session["auth"]["user_id"]
-    print(session, user_pk)
-    # Obtener el usuario actual
-    # user = db.q("select * from users where id = ?", (user_id,))[0]
-
-    user = auth_users("uuid=?", (user_pk,))[0]
+    user = _get_user_by_email(session["auth"]["email"])
     if not user:
         print(session, "Usuario no encontrado", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
