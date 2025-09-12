@@ -25,6 +25,7 @@ class BaseModel:
 
 class AuthUser(BaseModel):
     """Usuario del sistema - identidad básica para login."""
+    id: int
     username: str
     email: str
     password_hash: str
@@ -33,22 +34,25 @@ class AuthUser(BaseModel):
 
 class AuthGroup(BaseModel):
     """Grupos de usuarios para autorización (roles amplios)."""
+    id: int
     name: str
     description: str | None
 
 
 class AuthMembership(BaseModel):
     """Tabla de paso: asignación de usuarios a grupos."""
+    id: int
     auth_user_id: int
     auth_group_id: int
 
 
 class AuthPermissions(BaseModel):
+    id: int
     name: str
     group_id: int
 
 
-def create_tables():
+def create_auth_tables():
     auth_users = db.create(
         AuthUser,
         transform=True,
@@ -72,7 +76,11 @@ def create_tables():
         not_null={"auth_user_id", "auth_group_id"},
     )
 
-    auth_permissions = db.create(AuthPermissions, not_null={"name", "group_id"}, transform=True)
+    auth_permissions = db.create(
+        AuthPermissions, not_null={"name", "group_id"}, transform=True
+    )
+
+    return auth_users, auth_groups, auth_memberships, auth_permissions
 
 
-create_tables()
+create_auth_tables()

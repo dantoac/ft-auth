@@ -4,13 +4,12 @@ import uuid
 import bcrypt
 from fasthtml.common import *
 
-from auth.data.models import db, auth_users
+from auth.data.models import db, create_auth_tables
 from .components import ergonoti
 
 APP_NAME = "User Auth"
 
 rt = APIRouter(prefix="/auth")
-
 
 def requires_login(request, session):
     auth = request.scope["auth"] = session.get("auth", None)
