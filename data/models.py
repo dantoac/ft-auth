@@ -65,7 +65,7 @@ auth_groups = db.create(
 class AuthMembership(BaseModel):
     """Tabla de paso: asignación de usuarios a grupos."""
 
-    uuid: str
+    uuid: uuid.UUID
     auth_user: str
     auth_group: int
     assigned_at:int | None  # Unix timestamp
