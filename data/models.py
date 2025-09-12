@@ -1,17 +1,17 @@
-import time
 import uuid
 
 from data.models import db
 
-# ====================================================================
-# MÓDULO DE AUTENTICACIÓN/AUTORIZACIÓN REUTILIZABLE
-# ====================================================================
-
 
 class BaseModel:
     """Modelo base para todas las tablas."""
+
     created_at: int
     updated_at: int
+    created_by: int
+    updated_by: int
+    is_active: bool
+    uuid: uuid.UUID
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -25,65 +25,54 @@ class BaseModel:
 
 class AuthUser(BaseModel):
     """Usuario del sistema - identidad básica para login."""
-
-    uuid: uuid.UUID
     username: str
     email: str
     password_hash: str
-    is_active: bool
-    last_login:int | None  # Unix timestamp
+    last_login: int | None  # Unix timestamp
 
-
-auth_users = db.create(
-    AuthUser,
-    pk="uuid",
-    transform=True,
-    not_null={"uuid", "username", "email", "password_hash", "is_active"},
-    defaults={"is_active": True},
-)
-
-auth_users.create_index(["email"], unique=True, if_not_exists=True)
 
 class AuthGroup(BaseModel):
     """Grupos de usuarios para autorización (roles amplios)."""
-
-    id: int
     name: str
-    description:str | None
-    is_active: bool
-
-
-auth_groups = db.create(
-    AuthGroup,
-    pk="id",
-    transform=True,
-    not_null={"name", "is_active"},
-    defaults={"is_active": True},
-)
+    description: str | None
 
 
 class AuthMembership(BaseModel):
     """Tabla de paso: asignación de usuarios a grupos."""
-
-    uuid: uuid.UUID
-    auth_user: str
-    auth_group: int
-    assigned_at:int | None  # Unix timestamp
-
-
-auth_memberships = db.create(
-    AuthMembership,
-    pk="uuid",
-    foreign_keys=[("auth_user", "auth_user"), ("auth_group", "auth_group")],
-    transform=True,
-    not_null={"auth_user", "auth_group"},
-)
+    auth_user_id: int
+    auth_group_id: int
 
 
 class AuthPermissions(BaseModel):
-    uuid: str
     name: str
     group_id: int
 
 
-auth_permissions = db.create(AuthPermissions, pk="uuid", transform=True)
+def create_tables():
+    auth_users = db.create(
+        AuthUser,
+        transform=True,
+        not_null={"email", "password_hash"},
+        defaults={"is_active": True},
+    )
+
+    auth_users.create_index(["email"], unique=True, if_not_exists=True)
+
+    auth_groups = db.create(
+        AuthGroup,
+        transform=True,
+        not_null={"name", "is_active"},
+        defaults={"is_active": True},
+    )
+
+    auth_memberships = db.create(
+        AuthMembership,
+        foreign_keys=[("auth_user_id", "auth_user"), ("auth_group_id", "auth_group")],
+        transform=True,
+        not_null={"auth_user_id", "auth_group_id"},
+    )
+
+    auth_permissions = db.create(AuthPermissions, not_null={"name", "group_id"}, transform=True)
+
+
+create_tables()
