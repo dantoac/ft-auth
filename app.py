@@ -9,7 +9,11 @@ from .components import ergonoti
 
 APP_NAME = "User Auth"
 
+auth_users = db.t["auth_user"]
+auth_groups = db.t["auth_group"]
+
 rt = APIRouter(prefix="/auth")
+
 
 def requires_login(request, session):
     auth = request.scope["auth"] = session.get("auth", None)
@@ -348,7 +352,7 @@ def register_user(
             ergonoti(message=f"Error al registrar usuario: {str(e)}", type="error"),
             register_form(),
         )
-    print (f"redireccionando hacia {ROUTE_AFTER_REGISTER}")
+    print(f"redireccionando hacia {ROUTE_AFTER_REGISTER}")
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
@@ -362,36 +366,41 @@ def login(session, email: str, password: str, important: str = ""):
         return Redirect(logout)
 
     if not (len(email) and len(password)):
-        return ergonoti(
-            message="Debe completar el formulario", type="warning"
-        ), login_form()
+        return (
+            ergonoti(message="Debe completar el formulario", type="warning"),
+            login_form(),
+        )
 
     else:
         print(f"verificando {email} en users")
 
-        try:
-            user_exists = auth_users("email=?", (email,), limit=1)
-        except NotFoundError:
-            return ergonoti(
-                message="Credenciales desconocidas", type="error"
-            ), login_form()
+        user_exists = _get_user_by_email(email)
 
-        except Exception as e:
-            print(f"Error al buscar el usuario: {e}")
+        if user_exists and verify_password(password, user_exists.password_hash):
+            session["auth"] = {
+                "user_id": user_exists.uuid,
+                "email": email,
+                "uuid": user_exists.uuid,
+            }
+            import time
+
+            user_exists.last_login = int(time.time())
+            return Redirect(ROUTE_AFTER_LOGIN)
         else:
-            user_exists = user_exists[0]
-            print("verificando password")
-            if user_exists and verify_password(
-                password, user_exists.password_hash
-            ):
-                session["auth"] = {"user_id": user_exists.uuid, "email": email, "uuid": user_exists.uuid}
-                import time
-                user_exists.last_login = int(time.time())
-                return Redirect(ROUTE_AFTER_LOGIN)
-            else:
-                return ergonoti(
-                    message="Credenciales desconocidas", type="error"
-                ), login_form()
+            return (
+                ergonoti(message="Credenciales desconocidas", type="error"),
+                login_form(),
+            )
+
+
+def _get_user_by_email(email: str):
+    user_exists = None
+    try:
+        user_exists = auth_users("email=?", (email,), limit=1)
+    except Exception as e:
+        print(f"Error al buscar el usuario: {e}")
+
+    return user_exists[0] if user_exists else None
 
 
 @rt
