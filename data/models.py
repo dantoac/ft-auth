@@ -47,9 +47,12 @@ class AuthMembership(BaseModel):
 
 
 class AuthPermissions(BaseModel):
+    """This table is to set explicit permissions for users to arbitrary resources, like pages or API endpoints."""
     id: int
     name: str
-    group_id: int
+    auth_user_id: int
+    resource: str
+    allowed: bool
 
 
 def create_auth_tables():
@@ -77,7 +80,11 @@ def create_auth_tables():
     )
 
     auth_permissions = db.create(
-        AuthPermissions, not_null={"name", "group_id"}, transform=True
+        AuthPermissions,
+        not_null={"name", "auth_user_id", "resource"},
+        foreign_keys=["auth_user_id"],
+        defaults={"allowed": False},
+        transform=True,
     )
 
     return auth_users, auth_groups, auth_memberships, auth_permissions
