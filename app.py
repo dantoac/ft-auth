@@ -1,3 +1,6 @@
+import time
+import uuid
+
 import bcrypt
 from fasthtml.common import *
 
@@ -320,11 +323,11 @@ def register_user(
 
     try:
         # Verificar si ya existe el usuario
-        exists = auth_users("email=?", (email,)) or auth_users(
+        users_with_these_credentials = auth_users("email=?", (email,)) or auth_users(
             "username=?", (username,)
         )
 
-        if len(exists):
+        if len(users_with_these_credentials):
             return (
                 ergonoti(message="El usuario ya existe", type="error"),
                 register_form(),
@@ -332,9 +335,7 @@ def register_user(
 
         # Insertar nuevo usuario
         password_hash = get_password_hash(password)
-        import time
 
-        import uuid
         auth_users.insert(
             uuid=uuid.uuid4().hex,
             username=username or None,
@@ -370,8 +371,7 @@ def login(session, email: str, password: str, important: str = ""):
         print(f"verificando {email} en users")
 
         try:
-            user_exists = auth_users("email=?", (email,))
-            print ("existe", user_exists)
+            user_exists = auth_users("email=?", (email,), limit=1)
         except NotFoundError:
             return ergonoti(
                 message="Credenciales desconocidas", type="error"
@@ -466,10 +466,15 @@ def user_update(
 
 def user_template(content):
     return Div(
-        # Div("En mantención", _class="bg-red-600 text-white font-bold italic justify-center w-full text-center", _hx_trigger="load", _hx_on__load="console.log('cargando')"),
         Div(_id="notifications", _class="toast toast-top z-50"),
         Div(content, _id="auth-form-content"),
-        _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800",
+        # Div(
+        #     "En mantención",
+        #     _class="bg-red-600 fixed top-0 right-0 text-white font-bold italic justify-center rotate-z-45 translate-x-24 translate-y-24 w-100 p-2 text-center",
+        #     _hx_trigger="load",
+        #     _hx_on__load="console.log('cargando')",
+        # ),
+        _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800 overflow-hidden",
     )
 
 
