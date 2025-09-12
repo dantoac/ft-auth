@@ -334,7 +334,9 @@ def register_user(
         password_hash = get_password_hash(password)
         import time
 
+        import uuid
         auth_users.insert(
+            uuid=uuid.uuid4().hex,
             username=username or None,
             email=email,
             password_hash=password_hash,
@@ -368,8 +370,8 @@ def login(session, email: str, password: str, important: str = ""):
         print(f"verificando {email} en users")
 
         try:
-            exist_user = auth_users[email]
-            print ("existe", exist_user)
+            user_exists = auth_users("email=?", (email,))
+            print ("existe", user_exists)
         except NotFoundError:
             return ergonoti(
                 message="Credenciales desconocidas", type="error"
@@ -378,11 +380,14 @@ def login(session, email: str, password: str, important: str = ""):
         except Exception as e:
             print(f"Error al buscar el usuario: {e}")
         else:
+            user_exists = user_exists[0]
             print("verificando password")
-            if exist_user and verify_password(
-                password, auth_users[email].password_hash
+            if user_exists and verify_password(
+                password, user_exists.password_hash
             ):
-                session["auth"] = {"user_id": auth_users[email].id, "email": email}
+                session["auth"] = {"user_id": user_exists.uuid, "email": email, "uuid": user_exists.uuid}
+                import time
+                user_exists.last_login = int(time.time())
                 return Redirect(ROUTE_AFTER_LOGIN)
             else:
                 return ergonoti(
@@ -418,7 +423,7 @@ def user_update(
     # Obtener el usuario actual
     # user = db.q("select * from users where id = ?", (user_id,))[0]
 
-    user = auth_users("id=?", (user_pk,))[0]
+    user = auth_users("uuid=?", (user_pk,))[0]
     if not user:
         print(session, "Usuario no encontrado", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
@@ -442,7 +447,7 @@ def user_update(
                 # Guardar los cambios
                 try:
                     users_tbl = db.t["auth_user"]
-                    users_tbl.update(email=user.email, password_hash=new_password_hash)
+                    users_tbl.update(uuid=user.uuid, password_hash=new_password_hash)
                 except Exception as e:
                     db.rollback()
                     print(session, f"Error al actualizar usuario: {str(e)}", "error")

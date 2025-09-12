@@ -1,4 +1,5 @@
-
+import time
+import uuid
 
 from data.models import db
 
@@ -25,24 +26,23 @@ class BaseModel:
 class AuthUser(BaseModel):
     """Usuario del sistema - identidad básica para login."""
 
-    id: int
+    uuid: uuid.UUID
     username: str
     email: str
     password_hash: str
-    first_name:str | None
-    last_name:str | None
     is_active: bool
     last_login:int | None  # Unix timestamp
 
 
 auth_users = db.create(
     AuthUser,
-    pk="email",
+    pk="uuid",
     transform=True,
-    not_null={"username", "email", "password_hash", "is_active"},
+    not_null={"uuid", "username", "email", "password_hash", "is_active"},
     defaults={"is_active": True},
 )
 
+auth_users.create_index(["email"], unique=True, if_not_exists=True)
 
 class AuthGroup(BaseModel):
     """Grupos de usuarios para autorización (roles amplios)."""
