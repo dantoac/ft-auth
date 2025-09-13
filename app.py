@@ -22,7 +22,7 @@ def requires_login(request, session):
     return None
 
 
-beforeware = Beforeware(
+auth_beforeware = Beforeware(
     requires_login,
     skip=[
         r"/favicon\.ico",
@@ -34,12 +34,13 @@ beforeware = Beforeware(
         r"/auth/login",
         r"/auth/register",
         r"/auth/register_user",
+        r"/auth/@.*"
     ],
 )
 
 app = FastHTML(
     title=APP_NAME,
-    before=beforeware,
+    before=auth_beforeware,
     theme="dark",
     favicon="favicon.ico",
     hdrs=(
@@ -208,8 +209,9 @@ def login_form():
 
 @rt.get
 @rt.get("/index")
-@rt.get("/")
-def login():
+@rt.get("/@{resource}")
+def login(session, resource: str = ""):
+    session["tenant"] = resource
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
@@ -385,8 +387,9 @@ def login(session, email: str, password: str, important: str = ""):
 
             existing_user.last_login = int(time.time())
             db['auth_user'].update(existing_user)
-
-            return Redirect(ROUTE_AFTER_LOGIN)
+            print (ROUTE_AFTER_LOGIN)
+            print (session.get("tenant", "") + "/")
+            return Redirect(ROUTE_AFTER_LOGIN + "@"+session.get("tenant", ""))
         else:
             return (
                 ergonoti(message="Credenciales desconocidas", type="error"),

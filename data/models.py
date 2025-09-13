@@ -25,6 +25,7 @@ class BaseModel:
 
 class AuthUser(BaseModel):
     """Usuario del sistema - identidad básica para login."""
+
     id: int
     username: str
     email: str
@@ -34,6 +35,7 @@ class AuthUser(BaseModel):
 
 class AuthGroup(BaseModel):
     """Grupos de usuarios para autorización (roles amplios)."""
+
     id: int
     name: str
     description: str | None
@@ -41,6 +43,7 @@ class AuthGroup(BaseModel):
 
 class AuthMembership(BaseModel):
     """Tabla de paso: asignación de usuarios a grupos."""
+
     id: int
     auth_user_id: int
     auth_group_id: int
@@ -48,6 +51,7 @@ class AuthMembership(BaseModel):
 
 class AuthPermissions(BaseModel):
     """This table is to set explicit permissions for users to arbitrary resources, like pages or API endpoints."""
+
     id: int
     name: str
     auth_user_id: int
