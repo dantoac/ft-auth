@@ -76,12 +76,16 @@ def create_auth_tables():
         defaults={"is_active": True},
     )
 
+    auth_groups.create_index(["name"], unique=True, if_not_exists=True)
+
     auth_memberships = db.create(
         AuthMembership,
         foreign_keys=[("auth_user_id", "auth_user"), ("auth_group_id", "auth_group")],
         transform=True,
         not_null={"auth_user_id", "auth_group_id"},
     )
+
+    auth_memberships.create_index(["auth_user_id", "auth_group_id"], unique=True, if_not_exists=True)
 
     auth_permissions = db.create(
         AuthPermissions,
@@ -90,6 +94,8 @@ def create_auth_tables():
         defaults={"allowed": False},
         transform=True,
     )
+
+    auth_permissions.create_index(["name", "auth_user_id", "resource"], unique=True, if_not_exists=True)
 
     return auth_users, auth_groups, auth_memberships, auth_permissions
 
