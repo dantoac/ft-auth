@@ -437,15 +437,15 @@ def user_update(
 
     # Verificar la contraseña actual si se proporcionó
     if current_password:
-        if not verify_password(current_password, user.user_password_hash):
+        if not verify_password(current_password, user.password_hash):
             print("Contraseña actual incorrecta", "error")
-            return user_update_form(), ergonoti(
+            return user_update_form(session), ergonoti(
                 message="Contraseña actual incorrecta", type="error"
             )
         # Actualizar la contraseña si se proporcionó una nueva y se confirmó
         elif len(new_password):
             if new_password != confirm_password:
-                return user_update_form(), ergonoti(
+                return user_update_form(session), ergonoti(
                     message="Las contraseñas no coinciden", type="error"
                 )
             else:
@@ -454,19 +454,19 @@ def user_update(
                 # Guardar los cambios
                 try:
                     users_tbl = db.t["auth_user"]
-                    users_tbl.update(uuid=user.uuid, password_hash=new_password_hash)
+                    users_tbl.update(id=user.id, password_hash=new_password_hash)
                 except Exception as e:
                     db.rollback()
                     print(session, f"Error al actualizar usuario: {str(e)}", "error")
                 else:
                     print(session, "Contraseña actualizada correctamente", "success")
 
-                    return user_update_form(), ergonoti(
+                    return user_update_form(session), ergonoti(
                         message="Contraseña actualizada correctamente", type="success"
                     )
 
         else:
-            return user_update_form(), ergonoti(
+            return user_update_form(session), ergonoti(
                 message="La nueva contraseña no puede estar vacía", type="error"
             )
 
