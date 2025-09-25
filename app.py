@@ -456,7 +456,6 @@ def user_update(
                     users_tbl = db.t["auth_user"]
                     users_tbl.update(id=user.id, password_hash=new_password_hash)
                 except Exception as e:
-                    db.rollback()
                     print(session, f"Error al actualizar usuario: {str(e)}", "error")
                 else:
                     print(session, "Contraseña actualizada correctamente", "success")
