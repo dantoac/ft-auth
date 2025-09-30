@@ -28,8 +28,9 @@ auth_beforeware = Beforeware(
         r".*\.woff2",
         r".*\.js",
         r"/404",
-        r"/@*",
-        r"/auth/login"
+        r"/@.*",
+        r"/auth/.*",
+        r"/crud/.*"
     ],
 )
 
