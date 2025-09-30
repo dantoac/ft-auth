@@ -28,9 +28,7 @@ auth_beforeware = Beforeware(
         r".*\.woff2",
         r".*\.js",
         r"/404",
-        r"/@.*",
         r"/auth/.*",
-        r"/crud/.*"
     ],
 )
 
@@ -46,7 +44,7 @@ app = FastHTML(
 )
 
 
-def verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
+def _verify_password(plain_password: str = None, hashed_password: str = None) -> bool:
     if not all([plain_password, hashed_password]):
         return False
     return bcrypt.checkpw(
@@ -54,7 +52,7 @@ def verify_password(plain_password: str = None, hashed_password: str = None) -> 
     )
 
 
-def get_password_hash(password: str) -> str:
+def _get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
@@ -336,7 +334,7 @@ def register_user(
             )
 
         # Insertar nuevo usuario
-        password_hash = get_password_hash(password)
+        password_hash = _get_password_hash(password)
 
         auth_users.insert(
             uuid=uuid.uuid4().hex,
@@ -375,7 +373,7 @@ def login(session, email: str, password: str, important: str = ""):
 
         existing_user = _get_user_by_email(email)
 
-        if existing_user and verify_password(password, existing_user.password_hash):
+        if existing_user and _verify_password(password, existing_user.password_hash):
             session["auth"] = {
                 "user_id": existing_user.id,
                 "email": existing_user.email,
@@ -434,7 +432,7 @@ def user_update(
 
     # Verificar la contraseña actual si se proporcionó
     if current_password:
-        if not verify_password(current_password, user.password_hash):
+        if not _verify_password(current_password, user.password_hash):
             print("Contraseña actual incorrecta", "error")
             return user_update_form(session), ergonoti(
                 message="Contraseña actual incorrecta", type="error"
@@ -446,7 +444,7 @@ def user_update(
                     message="Las contraseñas no coinciden", type="error"
                 )
             else:
-                new_password_hash = get_password_hash(new_password)
+                new_password_hash = _get_password_hash(new_password)
 
                 # Guardar los cambios
                 try:
