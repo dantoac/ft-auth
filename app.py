@@ -15,26 +15,21 @@ auth_groups = db.t["auth_group"]
 rt = APIRouter(prefix="/auth")
 
 
-def requires_login(request, session):
+def _requires_login(request, session):
     auth = request.scope["auth"] = session.get("auth", None)
     if not auth:
-        return Redirect("/auth")
-    return None
-
+        return Redirect("/auth/login")
 
 auth_beforeware = Beforeware(
-    requires_login,
+    _requires_login,
     skip=[
         r"/favicon\.ico",
         r".*\.css",
         r".*\.woff2",
         r".*\.js",
-        r"/auth/index",
-        r"/auth/",
-        r"/auth/login",
-        r"/auth/register",
-        r"/auth/register_user",
-        r"/auth/@.*"
+        r"/404",
+        r"/@*",
+        r"/auth/login"
     ],
 )
 
@@ -207,9 +202,10 @@ def login_form():
     )
 
 
-@rt.get
-@rt.get("/index")
-@rt.get("/@{resource}")
+
+@rt("/login")
+#@rt.get("/auth/login")
+#@rt.get("/@{resource}")
 def login(session, resource: str = ""):
     session["tenant"] = resource
     """Muestra el formulario de inicio de sesión."""
