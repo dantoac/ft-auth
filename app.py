@@ -15,6 +15,13 @@ auth_groups = db.t["auth_group"]
 rt = APIRouter(prefix="/auth")
 
 
+ROUTE_AFTER_LOGIN = "/admin/"
+ROUTE_AFTER_REGISTER = "/login"
+ROUTE_AFTER_LOGOUT = "/login"
+ROUTE_AFTER_UPDATE = "/profile"
+
+
+
 def _requires_login(request, session):
     auth = request.scope["auth"] = session.get("auth", None)
     if not auth:
@@ -202,11 +209,10 @@ def login_form():
 
 
 
-@rt("/login")
-#@rt.get("/auth/login")
-#@rt.get("/@{resource}")
+@rt.get
 def login(session, resource: str = ""):
     session["tenant"] = resource
+    print (session)
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
@@ -353,15 +359,17 @@ def register_user(
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
-@rt.post
+@rt.post("/login_post")
 def login(session, email: str, password: str, important: str = ""):
     # si algún script/bot/ia llena el input "important" retorna vacío
     if len(important):
         return
-
+    print (email, password)
     if session.get("auth"):
+        print ("redirect to logout")
         return Redirect(logout)
 
+    print (email, password)
     if not (len(email) and len(password)):
         return (
             ergonoti(message="Debe completar el formulario", type="warning"),
@@ -372,7 +380,7 @@ def login(session, email: str, password: str, important: str = ""):
         print(f"verificando {email} en users")
 
         existing_user = _get_user_by_email(email)
-
+        print ("> ", existing_user)
         if existing_user and _verify_password(password, existing_user.password_hash):
             session["auth"] = {
                 "user_id": existing_user.id,
@@ -384,7 +392,7 @@ def login(session, email: str, password: str, important: str = ""):
             db['auth_user'].update(existing_user)
             print (ROUTE_AFTER_LOGIN)
             print (session.get("tenant", "") + "/")
-            return Redirect(ROUTE_AFTER_LOGIN + "@"+session.get("tenant", ""))
+            return Redirect(ROUTE_AFTER_LOGIN)
         else:
             return (
                 ergonoti(message="Credenciales desconocidas", type="error"),
@@ -477,12 +485,6 @@ def user_template(content):
         # ),
         _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800 overflow-hidden",
     )
-
-
-ROUTE_AFTER_LOGIN = "/"
-ROUTE_AFTER_REGISTER = rt.rt_funcs.login
-ROUTE_AFTER_LOGOUT = rt.rt_funcs.login
-ROUTE_AFTER_UPDATE = rt.rt_funcs.profile
 
 rt.to_app(app)
 serve(port=8000)
