@@ -16,8 +16,8 @@ rt = APIRouter(prefix="/auth")
 
 
 ROUTE_AFTER_LOGIN = "/admin/"
-ROUTE_AFTER_REGISTER = "/login"
-ROUTE_AFTER_LOGOUT = "/login"
+ROUTE_AFTER_REGISTER = "/auth/login"
+ROUTE_AFTER_LOGOUT = "/auth/login"
 ROUTE_AFTER_UPDATE = "/profile"
 
 
@@ -196,8 +196,8 @@ def login_form():
                 I(_class="fas fa-user-circle", _onclick="return false;"),
                 "Entrar",
                 _class="btn btn-primary w-full mt-4",
-                _hx_trigger="click",
-                _hx_post=login,
+                _type="submit",
+                _hx_post=login_post,
             ),
             _class="flex flex-col items-center gap-4 p-8 bg-slate-300 rounded-lg shadow-inner shadow-slate-900",
             _hx_swap="outerHTML",
@@ -209,9 +209,8 @@ def login_form():
 
 
 
-@rt.get
+@rt.get("/login")
 def login(session, resource: str = ""):
-    session["tenant"] = resource
     print (session)
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
@@ -232,7 +231,6 @@ def register_form():
                 autocomplete="off",
                 type="text",
                 _class="input input-bordered w-full max-w-xs",
-                required=True,
             ),
             Input(
                 id="email",
@@ -280,7 +278,7 @@ def register_form():
                 I(_class="fas fa-user-plus", _onclick="return false;"),
                 "Crear cuenta",
                 _class="btn btn-primary w-full mt-4",
-                _hx_trigger="click",
+                _type="submit",
                 _hx_post=register_user,
             ),
             _class="flex flex-col items-center gap-4 p-8 bg-slate-300 rounded-lg shadow-inner shadow-slate-900",
@@ -292,13 +290,13 @@ def register_form():
     )
 
 
-@rt
+@rt.get("/register")
 def register():
     """Muestra el formulario de registro."""
     return user_template(register_form())
 
 
-@rt.post
+@rt.post("/register")
 def register_user(
     username: str = "",
     email: str = "",
@@ -308,7 +306,7 @@ def register_user(
 ):
 
     # Evitar bots por honeypot
-    if len(important):
+    if len(important.strip()):
         return
 
     # Validaciones básicas
@@ -359,10 +357,10 @@ def register_user(
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
-@rt.post("/login_post")
-def login(session, email: str, password: str, important: str = ""):
+@rt.post("/login")
+def login_post(session, email: str, password: str, important: str = ""):
     # si algún script/bot/ia llena el input "important" retorna vacío
-    if len(important):
+    if len(important.strip()):
         return
     print (email, password)
     if session.get("auth"):
@@ -390,8 +388,7 @@ def login(session, email: str, password: str, important: str = ""):
 
             existing_user.last_login = int(time.time())
             db['auth_user'].update(existing_user)
-            print (ROUTE_AFTER_LOGIN)
-            print (session.get("tenant", "") + "/")
+            print ("ROUTE AFTER LOGIN", ROUTE_AFTER_LOGIN)
             return Redirect(ROUTE_AFTER_LOGIN)
         else:
             return (
