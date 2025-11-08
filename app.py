@@ -212,6 +212,7 @@ def login_form():
 @rt.get("/login")
 def login(session, resource: str = ""):
     print (session)
+    session.clear()
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
@@ -362,12 +363,11 @@ def login_post(session, email: str, password: str, important: str = ""):
     # si algún script/bot/ia llena el input "important" retorna vacío
     if len(important.strip()):
         return
-    print (email, password)
+
     if session.get("auth"):
         print ("redirect to logout")
         return Redirect(logout)
 
-    print (email, password)
     if not (len(email) and len(password)):
         return (
             ergonoti(message="Debe completar el formulario", type="warning"),
@@ -375,10 +375,8 @@ def login_post(session, email: str, password: str, important: str = ""):
         )
 
     else:
-        print(f"verificando {email} en users")
-
         existing_user = _get_user_by_email(email)
-        print ("> ", existing_user)
+
         if existing_user and _verify_password(password, existing_user.password_hash):
             session["auth"] = {
                 "user_id": existing_user.id,
