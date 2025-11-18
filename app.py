@@ -211,7 +211,7 @@ def login_form():
 
 @rt.get("/login")
 def login(session, resource: str = ""):
-    print (session)
+    print ("/auth/login", session)
     session.clear()
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
