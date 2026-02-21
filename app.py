@@ -1,6 +1,7 @@
 import logging
 import time
 import uuid
+from collections import defaultdict
 
 import bcrypt
 from fasthtml.common import *
@@ -23,6 +24,30 @@ ROUTE_AFTER_LOGIN = "/admin/"
 ROUTE_AFTER_REGISTER = "/auth/login"
 ROUTE_AFTER_LOGOUT = "/auth/login"
 ROUTE_AFTER_UPDATE = "/profile"
+
+# --- Rate limiting en memoria para login (VULN-09) ---
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 60
+
+
+def _is_rate_limited(ip: str) -> bool:
+    """Verifica si una IP ha excedido el límite de intentos de login."""
+    now = time.time()
+    # Limpiar intentos antiguos fuera de la ventana
+    _login_attempts[ip] = [
+        t for t in _login_attempts[ip] if now - t < LOGIN_WINDOW_SECONDS
+    ]
+    # Liberar memoria de IPs sin intentos recientes
+    if not _login_attempts[ip]:
+        del _login_attempts[ip]
+        return False
+    return len(_login_attempts[ip]) >= MAX_LOGIN_ATTEMPTS
+
+
+def _record_login_attempt(ip: str) -> None:
+    """Registra un intento de login para la IP dada."""
+    _login_attempts[ip].append(time.time())
 
 
 def _requires_login(request, session):
@@ -77,35 +102,35 @@ def logout(session):
 
 
 def user_update_form(session):
+    """Formulario de actualización de perfil.
+
+    UX-31: La contraseña actual está dentro de la sección colapsable junto
+    con los campos de nueva contraseña, dejando claro que solo se necesita
+    para cambiar la contraseña.
+    """
     return Form(
         H2(
             f"Actualizando datos de {session['auth']['email']}",
             _class="text-xl font-bold mb-4",
         ),
         Div(
-            Div(
-                Label(
-                    "Contraseña actual",
-                    _for="current_password",
-                    _class="text-sm font-medium",
-                )
-            ),
-            Div(
-                Input(
-                    id="current_password",
-                    name="current_password",
-                    type="password",
-                    required=True,
-                    placeholder="Confirme su contraseña actual",
-                    _class="input input-bordered w-full dark:text-slate-600",
-                )
-            ),
-            _class="mb-4",
-        ),
-        Div(
             Input(_type="checkbox"),
             Div("Cambiar Contraseña", _class="collapse-title"),
             Div(
+                Div(
+                    Label(
+                        "Contraseña actual",
+                        _for="current_password",
+                        _class="text-sm font-medium",
+                    ),
+                    Input(
+                        id="current_password",
+                        name="current_password",
+                        type="password",
+                        placeholder="Confirme su contraseña actual",
+                        _class="input input-bordered w-full dark:text-slate-600",
+                    ),
+                ),
                 Div(
                     Label(
                         "Nueva contraseña",
@@ -164,6 +189,11 @@ def user_update_form(session):
 
 
 def login_form():
+    """Formulario de inicio de sesión.
+
+    UX-06: type="email" para validación nativa del navegador.
+    UX-19: _required=True en ambos campos para evitar envíos vacíos.
+    """
     return Div(
         Form(
             H1(
@@ -177,6 +207,7 @@ def login_form():
                 placeholder="email",
                 autocomplete="off",
                 type="email",
+                _required=True,
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -185,6 +216,7 @@ def login_form():
                 type="password",
                 autocomplete="off",
                 placeholder="Contraseña",
+                _required=True,
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -216,11 +248,22 @@ def login_form():
 
 @rt.get("/login")
 def login(session, resource: str = ""):
-    """Muestra el formulario de inicio de sesión."""
+    """Muestra el formulario de inicio de sesión.
+
+    UX-07: Solo limpia claves de autenticación, preserva tenant_uuid y
+    otras claves de sesión no relacionadas con auth.
+    """
+    for key in ["auth", "user_id", "user_uuid", "email"]:
+        session.pop(key, None)
     return user_template(login_form())
 
 
-def register_form():
+def register_form(username: str = "", email: str = ""):
+    """Formulario de registro.
+
+    UX-18: Acepta parámetros opcionales para preservar los valores
+    ingresados cuando el formulario falla la validación.
+    """
     return Div(
         Form(
             H1(
@@ -234,6 +277,7 @@ def register_form():
                 placeholder="Usuario (opcional)",
                 autocomplete="off",
                 type="text",
+                value=username,
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -243,6 +287,7 @@ def register_form():
                 placeholder="Correo electrónico",
                 autocomplete="off",
                 type="email",
+                value=email,
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -319,13 +364,7 @@ def register_user(
     if not (len(email) and len(password) and len(confirm_password)):
         return (
             ergonoti(message="Debe completar los campos obligatorios", type="warning"),
-            register_form(),
-        )
-
-    if password != confirm_password:
-        return (
-            ergonoti(message="Las contraseñas no coinciden", type="error"),
-            register_form(),
+            register_form(username=username, email=email),
         )
 
     if len(password) < MIN_PASSWORD_LENGTH:
@@ -334,7 +373,13 @@ def register_user(
                 message=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
                 type="error",
             ),
-            register_form(),
+            register_form(username=username, email=email),
+        )
+
+    if password != confirm_password:
+        return (
+            ergonoti(message="Las contraseñas no coinciden", type="error"),
+            register_form(username=username, email=email),
         )
 
     # Normalizar username simple
@@ -349,7 +394,7 @@ def register_user(
         if len(users_with_these_credentials):
             return (
                 ergonoti(message="El usuario ya existe", type="error"),
-                register_form(),
+                register_form(username=username, email=email),
             )
 
         # Insertar nuevo usuario
@@ -367,25 +412,36 @@ def register_user(
         logger.exception("Error al registrar usuario")
         return (
             ergonoti(
-                message="Error al registrar usuario. Intente nuevamente.",
+                message="Ocurrió un error al registrar el usuario. Intente nuevamente.",
                 type="error",
             ),
-            register_form(),
+            register_form(username=username, email=email),
         )
-    logger.debug("Redireccionando hacia %s", ROUTE_AFTER_REGISTER)
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
 @rt.post("/login")
-def login_post(session, email: str, password: str, important: str = ""):
+def login_post(request, session, email: str, password: str, important: str = ""):
     # si algún script/bot/ia llena el input "important" retorna vacío
     if len(important.strip()):
         return
+
+    # VULN-09: Rate limiting por IP
+    client_ip = request.client.host if request.client else "unknown"
+    if _is_rate_limited(client_ip):
+        return (
+            ergonoti(
+                message="Demasiados intentos de inicio de sesión. Espere un momento.",
+                type="error",
+            ),
+            login_form(),
+        )
 
     if session.get("auth"):
         return Redirect(logout)
 
     if not (len(email) and len(password)):
+        _record_login_attempt(client_ip)
         return (
             ergonoti(message="Debe completar el formulario", type="warning"),
             login_form(),
@@ -405,6 +461,8 @@ def login_post(session, email: str, password: str, important: str = ""):
             db["auth_user"].update(existing_user)
             return Redirect(ROUTE_AFTER_LOGIN)
         else:
+            # Registrar intento fallido para rate limiting
+            _record_login_attempt(client_ip)
             return (
                 ergonoti(message="Credenciales desconocidas", type="error"),
                 login_form(),
@@ -436,7 +494,7 @@ def user_update(
     """
     Endpoint para actualizar la información del usuario.
 
-    Permite a los usuarios actualizar su correo electrónico y/o contraseña.
+    Permite a los usuarios actualizar su contraseña.
     Requiere la contraseña actual para verificación antes de realizar cambios.
     """
     # Asegurarse de que el usuario esté autenticado
@@ -448,53 +506,57 @@ def user_update(
         logger.warning("Usuario no encontrado para email: %s", session["auth"]["email"])
         return Redirect(ROUTE_AFTER_LOGOUT)
 
-    # Verificar la contraseña actual si se proporcionó
-    if current_password:
-        if not _verify_password(current_password, user.password_hash):
+    # UX-08: Si no se proporcionó contraseña actual, informar que no hay cambios
+    if not current_password:
+        return user_update_form(session), ergonoti(
+            message="No se realizaron cambios", type="info"
+        )
+
+    # Verificar la contraseña actual
+    if not _verify_password(current_password, user.password_hash):
+        return user_update_form(session), ergonoti(
+            message="Contraseña actual incorrecta", type="error"
+        )
+
+    # Actualizar la contraseña si se proporcionó una nueva y se confirmó
+    if len(new_password):
+        if new_password != confirm_password:
             return user_update_form(session), ergonoti(
-                message="Contraseña actual incorrecta", type="error"
+                message="Las contraseñas no coinciden", type="error"
             )
-        # Actualizar la contraseña si se proporcionó una nueva y se confirmó
-        elif len(new_password):
-            if new_password != confirm_password:
+        elif len(new_password) < MIN_PASSWORD_LENGTH:
+            return user_update_form(session), ergonoti(
+                message=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
+                type="error",
+            )
+        else:
+            new_password_hash = _get_password_hash(new_password)
+
+            # Guardar los cambios
+            try:
+                users_tbl = db.t["auth_user"]
+                users_tbl.update(id=user.id, password_hash=new_password_hash)
+            except Exception:
+                logger.exception("Error al actualizar contraseña del usuario")
                 return user_update_form(session), ergonoti(
-                    message="Las contraseñas no coinciden", type="error"
-                )
-            elif len(new_password) < MIN_PASSWORD_LENGTH:
-                return user_update_form(session), ergonoti(
-                    message=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
+                    message="Error al actualizar la contraseña. Intente nuevamente.",
                     type="error",
                 )
             else:
-                new_password_hash = _get_password_hash(new_password)
+                return user_update_form(session), ergonoti(
+                    message="Contraseña actualizada correctamente", type="success"
+                )
 
-                # Guardar los cambios
-                try:
-                    users_tbl = db.t["auth_user"]
-                    users_tbl.update(id=user.id, password_hash=new_password_hash)
-                except Exception:
-                    logger.exception("Error al actualizar contraseña del usuario")
-                else:
-                    return user_update_form(session), ergonoti(
-                        message="Contraseña actualizada correctamente", type="success"
-                    )
-
-        else:
-            return user_update_form(session), ergonoti(
-                message="La nueva contraseña no puede estar vacía", type="error"
-            )
+    else:
+        return user_update_form(session), ergonoti(
+            message="La nueva contraseña no puede estar vacía", type="error"
+        )
 
 
 def user_template(content):
     return Div(
         Div(_id="notifications", _class="toast toast-top z-50"),
         Div(content, _id="auth-form-content"),
-        # Div(
-        #     "En mantención",
-        #     _class="bg-red-600 fixed top-0 right-0 text-white font-bold italic justify-center rotate-z-45 translate-x-24 translate-y-24 w-100 p-2 text-center",
-        #     _hx_trigger="load",
-        #     _hx_on__load="console.log('cargando')",
-        # ),
         _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-base-200 overflow-hidden",
     )
 
