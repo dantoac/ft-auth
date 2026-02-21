@@ -1,3 +1,4 @@
+import logging
 import time
 import uuid
 
@@ -7,7 +8,10 @@ from fasthtml.common import *
 from auth.data.models import db, create_auth_tables
 from .components import ergonoti
 
+logger = logging.getLogger(__name__)
+
 APP_NAME = "User Auth"
+MIN_PASSWORD_LENGTH = 8
 
 auth_users = db.t["auth_user"]
 auth_groups = db.t["auth_group"]
@@ -21,11 +25,11 @@ ROUTE_AFTER_LOGOUT = "/auth/login"
 ROUTE_AFTER_UPDATE = "/profile"
 
 
-
 def _requires_login(request, session):
     auth = request.scope["auth"] = session.get("auth", None)
     if not auth:
         return Redirect("/auth/login")
+
 
 auth_beforeware = Beforeware(
     _requires_login,
@@ -112,7 +116,8 @@ def user_update_form(session):
                         id="new_password",
                         name="new_password",
                         type="password",
-                        placeholder="Nueva contraseña",
+                        placeholder="Nueva contraseña (mínimo 8 caracteres)",
+                        minlength="8",
                         _class="input input-bordered w-full dark:text-slate-600",
                     ),
                 ),
@@ -127,6 +132,7 @@ def user_update_form(session):
                         name="confirm_password",
                         type="password",
                         placeholder="Confirmar nueva contraseña",
+                        minlength="8",
                         _class="input input-bordered w-full bg-white dark:text-slate-600",
                     ),
                 ),
@@ -170,7 +176,7 @@ def login_form():
                 name="email",
                 placeholder="email",
                 autocomplete="off",
-                type="text",
+                type="email",
                 _class="input input-bordered w-full max-w-xs",
             ),
             Input(
@@ -208,11 +214,8 @@ def login_form():
     )
 
 
-
 @rt.get("/login")
 def login(session, resource: str = ""):
-    print ("/auth/login", session)
-    session.clear()
     """Muestra el formulario de inicio de sesión."""
     return user_template(login_form())
 
@@ -247,9 +250,10 @@ def register_form():
                 name="password",
                 type="password",
                 autocomplete="off",
-                placeholder="Contraseña",
+                placeholder="Contraseña (mínimo 8 caracteres)",
                 _class="input input-bordered w-full max-w-xs",
                 required=True,
+                minlength="8",
             ),
             Input(
                 id="confirm_password",
@@ -259,6 +263,7 @@ def register_form():
                 placeholder="Confirmar contraseña",
                 _class="input input-bordered w-full max-w-xs",
                 required=True,
+                minlength="8",
             ),
             Input(
                 id="important",
@@ -323,6 +328,15 @@ def register_user(
             register_form(),
         )
 
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return (
+            ergonoti(
+                message=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
+                type="error",
+            ),
+            register_form(),
+        )
+
     # Normalizar username simple
     username = username.strip()
 
@@ -349,12 +363,16 @@ def register_user(
             created_at=int(time.time()),
             updated_at=int(time.time()),
         )
-    except Exception as e:
+    except Exception:
+        logger.exception("Error al registrar usuario")
         return (
-            ergonoti(message=f"Error al registrar usuario: {str(e)}", type="error"),
+            ergonoti(
+                message="Error al registrar usuario. Intente nuevamente.",
+                type="error",
+            ),
             register_form(),
         )
-    print(f"redireccionando hacia {ROUTE_AFTER_REGISTER}")
+    logger.debug("Redireccionando hacia %s", ROUTE_AFTER_REGISTER)
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
@@ -365,7 +383,6 @@ def login_post(session, email: str, password: str, important: str = ""):
         return
 
     if session.get("auth"):
-        print ("redirect to logout")
         return Redirect(logout)
 
     if not (len(email) and len(password)):
@@ -385,8 +402,7 @@ def login_post(session, email: str, password: str, important: str = ""):
             }
 
             existing_user.last_login = int(time.time())
-            db['auth_user'].update(existing_user)
-            print ("ROUTE AFTER LOGIN", ROUTE_AFTER_LOGIN)
+            db["auth_user"].update(existing_user)
             return Redirect(ROUTE_AFTER_LOGIN)
         else:
             return (
@@ -399,8 +415,8 @@ def _get_user_by_email(email: str):
     user_exists = None
     try:
         user_exists = auth_users("email=?", (email,), limit=1)
-    except Exception as e:
-        print(f"Error al buscar el usuario: {e}")
+    except Exception:
+        logger.exception("Error al buscar el usuario")
 
     return user_exists[0] if user_exists else None
 
@@ -425,18 +441,16 @@ def user_update(
     """
     # Asegurarse de que el usuario esté autenticado
     if "auth" not in session:
-        print(session, "Debe iniciar sesión", "error")
         return Redirect(ROUTE_AFTER_LOGOUT)
 
     user = _get_user_by_email(session["auth"]["email"])
     if not user:
-        print(session, "Usuario no encontrado", "error")
+        logger.warning("Usuario no encontrado para email: %s", session["auth"]["email"])
         return Redirect(ROUTE_AFTER_LOGOUT)
 
     # Verificar la contraseña actual si se proporcionó
     if current_password:
         if not _verify_password(current_password, user.password_hash):
-            print("Contraseña actual incorrecta", "error")
             return user_update_form(session), ergonoti(
                 message="Contraseña actual incorrecta", type="error"
             )
@@ -446,6 +460,11 @@ def user_update(
                 return user_update_form(session), ergonoti(
                     message="Las contraseñas no coinciden", type="error"
                 )
+            elif len(new_password) < MIN_PASSWORD_LENGTH:
+                return user_update_form(session), ergonoti(
+                    message=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
+                    type="error",
+                )
             else:
                 new_password_hash = _get_password_hash(new_password)
 
@@ -453,11 +472,9 @@ def user_update(
                 try:
                     users_tbl = db.t["auth_user"]
                     users_tbl.update(id=user.id, password_hash=new_password_hash)
-                except Exception as e:
-                    print(session, f"Error al actualizar usuario: {str(e)}", "error")
+                except Exception:
+                    logger.exception("Error al actualizar contraseña del usuario")
                 else:
-                    print(session, "Contraseña actualizada correctamente", "success")
-
                     return user_update_form(session), ergonoti(
                         message="Contraseña actualizada correctamente", type="success"
                     )
@@ -478,8 +495,9 @@ def user_template(content):
         #     _hx_trigger="load",
         #     _hx_on__load="console.log('cargando')",
         # ),
-        _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-slate-700 dark:bg-slate-800 overflow-hidden",
+        _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-base-200 overflow-hidden",
     )
+
 
 rt.to_app(app)
 serve(port=8000)
