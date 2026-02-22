@@ -46,8 +46,6 @@ db.q(
 def _is_rate_limited(ip: str) -> bool:
     """Verifica si una IP ha excedido el límite de intentos de login."""
     cutoff = time.time() - LOGIN_WINDOW_SECONDS
-    # Limpiar intentos antiguos (limpieza oportunista)
-    db.q("DELETE FROM login_attempt WHERE attempted_at < ?", (cutoff,))
     rows = db.q(
         "SELECT COUNT(*) as cnt FROM login_attempt WHERE ip = ? AND attempted_at >= ?",
         (ip, cutoff),
@@ -61,6 +59,14 @@ def _record_login_attempt(ip: str) -> None:
         "INSERT INTO login_attempt (ip, attempted_at) VALUES (?, ?)",
         (ip, time.time()),
     )
+    # Limpieza oportunista de intentos expirados
+    cutoff = time.time() - LOGIN_WINDOW_SECONDS
+    db.q("DELETE FROM login_attempt WHERE attempted_at < ?", (cutoff,))
+
+
+def _clear_login_attempts(ip: str) -> None:
+    """Limpia los intentos de login para una IP tras autenticación exitosa."""
+    db.q("DELETE FROM login_attempt WHERE ip = ?", (ip,))
 
 
 def _requires_login(request, session):
@@ -471,6 +477,7 @@ def login_post(request, session, email: str, password: str, important: str = "")
 
             existing_user.last_login = int(time.time())
             db["auth_user"].update(existing_user)
+            _clear_login_attempts(client_ip)
             return Redirect(ROUTE_AFTER_LOGIN)
         else:
             # Registrar intento fallido para rate limiting
