@@ -1,7 +1,6 @@
 import logging
 import time
 import uuid
-from collections import defaultdict
 
 import bcrypt
 from fasthtml.common import *
@@ -25,29 +24,43 @@ ROUTE_AFTER_REGISTER = "/auth/login"
 ROUTE_AFTER_LOGOUT = "/auth/login"
 ROUTE_AFTER_UPDATE = "/profile"
 
-# --- Rate limiting en memoria para login (VULN-09) ---
-_login_attempts: dict[str, list[float]] = defaultdict(list)
+# --- Rate limiting persistente en SQLite (VULN-09) ---
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 60
+
+# Crear tabla de intentos de login si no existe
+db.q(
+    """
+    CREATE TABLE IF NOT EXISTS login_attempt (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip TEXT NOT NULL,
+        attempted_at REAL NOT NULL
+    )
+"""
+)
+db.q(
+    "CREATE INDEX IF NOT EXISTS idx_login_attempt_ip ON login_attempt (ip, attempted_at)"
+)
 
 
 def _is_rate_limited(ip: str) -> bool:
     """Verifica si una IP ha excedido el límite de intentos de login."""
-    now = time.time()
-    # Limpiar intentos antiguos fuera de la ventana
-    _login_attempts[ip] = [
-        t for t in _login_attempts[ip] if now - t < LOGIN_WINDOW_SECONDS
-    ]
-    # Liberar memoria de IPs sin intentos recientes
-    if not _login_attempts[ip]:
-        del _login_attempts[ip]
-        return False
-    return len(_login_attempts[ip]) >= MAX_LOGIN_ATTEMPTS
+    cutoff = time.time() - LOGIN_WINDOW_SECONDS
+    # Limpiar intentos antiguos (limpieza oportunista)
+    db.q("DELETE FROM login_attempt WHERE attempted_at < ?", (cutoff,))
+    rows = db.q(
+        "SELECT COUNT(*) as cnt FROM login_attempt WHERE ip = ? AND attempted_at >= ?",
+        (ip, cutoff),
+    )
+    return (rows[0]["cnt"] if rows else 0) >= MAX_LOGIN_ATTEMPTS
 
 
 def _record_login_attempt(ip: str) -> None:
     """Registra un intento de login para la IP dada."""
-    _login_attempts[ip].append(time.time())
+    db.q(
+        "INSERT INTO login_attempt (ip, attempted_at) VALUES (?, ?)",
+        (ip, time.time()),
+    )
 
 
 def _requires_login(request, session):
@@ -441,7 +454,6 @@ def login_post(request, session, email: str, password: str, important: str = "")
         return Redirect(logout)
 
     if not (len(email) and len(password)):
-        _record_login_attempt(client_ip)
         return (
             ergonoti(message="Debe completar el formulario", type="warning"),
             login_form(),
