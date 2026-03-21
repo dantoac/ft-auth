@@ -17,7 +17,7 @@ def ergonoti(
     )(
         # Div(_class="bg-slate-950/60")(
         Div(
-            _class=f"alert alert-{type} drop-shadow-md drop-shadow-slate-950 flex flex-row justify-between",
+            _class=f"alert alert-{type} drop-shadow-lg flex flex-row justify-between",
             role="alert",
         )(
             Span(f"{message}"),
