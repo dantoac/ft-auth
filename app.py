@@ -133,8 +133,16 @@ def user_update_form(session):
             _class="text-xl font-bold mb-4",
         ),
         Div(
-            Input(_type="checkbox"),
-            Div("Cambiar Contraseña", _class="collapse-title"),
+            Input(
+                _type="checkbox",
+                id="toggle-change-password",
+                _aria_label="Expandir sección para cambiar contraseña",
+            ),
+            Label(
+                "Cambiar Contraseña",
+                _for="toggle-change-password",
+                _class="collapse-title cursor-pointer",
+            ),
             Div(
                 Div(
                     Label(
