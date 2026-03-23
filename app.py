@@ -155,6 +155,7 @@ def user_update_form(session):
                         name="current_password",
                         type="password",
                         placeholder="Confirme su contraseña actual",
+                        autocomplete="current-password",
                         _class="input input-bordered w-full",
                     ),
                 ),
@@ -170,6 +171,7 @@ def user_update_form(session):
                         type="password",
                         placeholder="Nueva contraseña (mínimo 8 caracteres)",
                         minlength="8",
+                        autocomplete="new-password",
                         _class="input input-bordered w-full",
                     ),
                 ),
@@ -185,6 +187,7 @@ def user_update_form(session):
                         type="password",
                         placeholder="Confirmar nueva contraseña",
                         minlength="8",
+                        autocomplete="new-password",
                         _class="input input-bordered w-full bg-base-100",
                     ),
                 ),
@@ -470,17 +473,8 @@ def register_user(
         # Verificar si ya existe el username (solo si se proporcionó)
         username_exists = username and auth_users("username=?", (username,))
 
-        if email_exists:
-            # VULN-06: no revelar si el email existe exactamente; mensaje ambiguo
-            return (
-                ergonoti(
-                    message="El correo electrónico o nombre de usuario ya está registrado",
-                    type="error",
-                ),
-                register_form(username=username, email=email),
-            )
-
-        if username_exists:
+        # VULN-06: ejecutar ambas verificaciones siempre para evitar timing side-channel
+        if email_exists or username_exists:
             return (
                 ergonoti(
                     message="El correo electrónico o nombre de usuario ya está registrado",
