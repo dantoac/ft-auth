@@ -457,14 +457,27 @@ def register_user(
     username = username.strip()
 
     try:
-        # Verificar si ya existe el usuario
-        users_with_these_credentials = auth_users("email=?", (email,)) or auth_users(
-            "username=?", (username,)
-        )
+        # Verificar si ya existe el email
+        email_exists = auth_users("email=?", (email,))
+        # Verificar si ya existe el username (solo si se proporcionó)
+        username_exists = username and auth_users("username=?", (username,))
 
-        if len(users_with_these_credentials):
+        if email_exists:
+            # VULN-06: no revelar si el email existe exactamente; mensaje ambiguo
             return (
-                ergonoti(message="El usuario ya existe", type="error"),
+                ergonoti(
+                    message="El correo electrónico o nombre de usuario ya está registrado",
+                    type="error",
+                ),
+                register_form(username=username, email=email),
+            )
+
+        if username_exists:
+            return (
+                ergonoti(
+                    message="El correo electrónico o nombre de usuario ya está registrado",
+                    type="error",
+                ),
                 register_form(username=username, email=email),
             )
 
