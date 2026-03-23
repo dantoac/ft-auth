@@ -212,6 +212,8 @@ def login_form():
 
     UX-06: type="email" para validación nativa del navegador.
     UX-19: _required=True en ambos campos para evitar envíos vacíos.
+    UX-01: autocomplete="email"/"current-password" para compatibilidad con gestores de contraseñas.
+    UX-02: Labels visibles asociadas a cada campo para cumplir WCAG 2.1.
     """
     return Div(
         Form(
@@ -220,23 +222,39 @@ def login_form():
                 "Iniciar Sesión",
                 _class="text-2xl font-bold mb-4",
             ),
-            Input(
-                id="email",
-                name="email",
-                placeholder="email",
-                autocomplete="off",
-                type="email",
-                _required=True,
-                _class="input input-bordered w-full max-w-xs",
+            Div(
+                Label(
+                    "Correo electrónico",
+                    _for="email",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="email",
+                    name="email",
+                    placeholder="correo@ejemplo.com",
+                    autocomplete="email",
+                    type="email",
+                    _required=True,
+                    _class="input input-bordered w-full max-w-xs",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
-            Input(
-                id="password",
-                name="password",
-                type="password",
-                autocomplete="off",
-                placeholder="Contraseña",
-                _required=True,
-                _class="input input-bordered w-full max-w-xs",
+            Div(
+                Label(
+                    "Contraseña",
+                    _for="password",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="password",
+                    name="password",
+                    type="password",
+                    autocomplete="current-password",
+                    placeholder="Contraseña",
+                    _required=True,
+                    _class="input input-bordered w-full max-w-xs",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
             Input(
                 id="important",
@@ -250,7 +268,7 @@ def login_form():
                 _class="w-full text-right mt-2",
             ),
             Button(
-                I(_class="fas fa-user-circle", _onclick="return false;"),
+                I(_class="fas fa-user-circle", _aria_hidden="true"),
                 "Entrar",
                 _class="btn btn-primary w-full mt-4",
                 _type="submit",
@@ -282,6 +300,8 @@ def register_form(username: str = "", email: str = ""):
 
     UX-18: Acepta parámetros opcionales para preservar los valores
     ingresados cuando el formulario falla la validación.
+    UX-01: autocomplete estándar para compatibilidad con gestores de contraseñas.
+    UX-02: Labels visibles asociadas a cada campo para cumplir WCAG 2.1.
     """
     return Div(
         Form(
@@ -290,44 +310,76 @@ def register_form(username: str = "", email: str = ""):
                 "Registro",
                 _class="text-2xl font-bold mb-4",
             ),
-            Input(
-                id="username",
-                name="username",
-                placeholder="Usuario (opcional)",
-                autocomplete="off",
-                type="text",
-                value=username,
-                _class="input input-bordered w-full max-w-xs",
+            Div(
+                Label(
+                    "Usuario (opcional)",
+                    _for="username",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="username",
+                    name="username",
+                    placeholder="nombre_usuario",
+                    autocomplete="username",
+                    type="text",
+                    value=username,
+                    _class="input input-bordered w-full max-w-xs",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
-            Input(
-                id="email",
-                name="email",
-                required=True,
-                placeholder="Correo electrónico",
-                autocomplete="off",
-                type="email",
-                value=email,
-                _class="input input-bordered w-full max-w-xs",
+            Div(
+                Label(
+                    "Correo electrónico",
+                    _for="email",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="email",
+                    name="email",
+                    required=True,
+                    placeholder="correo@ejemplo.com",
+                    autocomplete="email",
+                    type="email",
+                    value=email,
+                    _class="input input-bordered w-full max-w-xs",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
-            Input(
-                id="password",
-                name="password",
-                type="password",
-                autocomplete="off",
-                placeholder="Contraseña (mínimo 8 caracteres)",
-                _class="input input-bordered w-full max-w-xs",
-                required=True,
-                minlength="8",
+            Div(
+                Label(
+                    "Contraseña",
+                    _for="password",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="password",
+                    name="password",
+                    type="password",
+                    autocomplete="new-password",
+                    placeholder="Mínimo 8 caracteres",
+                    _class="input input-bordered w-full max-w-xs",
+                    required=True,
+                    minlength="8",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
-            Input(
-                id="confirm_password",
-                name="confirm_password",
-                type="password",
-                autocomplete="off",
-                placeholder="Confirmar contraseña",
-                _class="input input-bordered w-full max-w-xs",
-                required=True,
-                minlength="8",
+            Div(
+                Label(
+                    "Confirmar contraseña",
+                    _for="confirm_password",
+                    _class="text-sm font-medium",
+                ),
+                Input(
+                    id="confirm_password",
+                    name="confirm_password",
+                    type="password",
+                    autocomplete="new-password",
+                    placeholder="Repetir contraseña",
+                    _class="input input-bordered w-full max-w-xs",
+                    required=True,
+                    minlength="8",
+                ),
+                _class="flex flex-col gap-1 w-full max-w-xs",
             ),
             Input(
                 id="important",
@@ -345,7 +397,7 @@ def register_form(username: str = "", email: str = ""):
                 _class="w-full text-right mt-2",
             ),
             Button(
-                I(_class="fas fa-user-plus", _onclick="return false;"),
+                I(_class="fas fa-user-plus", _aria_hidden="true"),
                 "Crear cuenta",
                 _class="btn btn-primary w-full mt-4",
                 _type="submit",
