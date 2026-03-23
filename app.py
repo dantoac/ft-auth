@@ -647,7 +647,13 @@ def user_update(
 
 def user_template(content):
     return Div(
-        Div(_id="notifications", _class="toast toast-top z-50"),
+        # UX-15: aria_live="polite" para que lectores de pantalla anuncien notificaciones
+        Div(
+            _id="notifications",
+            _class="toast toast-top z-50",
+            _aria_live="polite",
+            _aria_atomic="true",
+        ),
         Div(content, _id="auth-form-content"),
         _class="flex flex-col justify-center gap-8 items-center w-full min-h-screen bg-base-200 overflow-hidden",
     )
