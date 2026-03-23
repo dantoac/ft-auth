@@ -24,13 +24,17 @@ def ergonoti(
             Button(
                 I(_class="fas fa-xmark"),
                 _class=f"btn btn-xs btn-{type}",
+                _aria_label="Cerrar",
                 _onclick="let el=me(this.parentNode); clearTimeout(el.timeout); el.remove()",
             ),
-            Script(f"""
-            me(".alert").run((el)=>{{
-              el.timeout = setTimeout(function(){{me(".alert").remove()}}, {timeout})
-            }});
-            """),
+            Script(
+                f"""
+            {{
+              let alertEl = me().parentElement;
+              alertEl.timeout = setTimeout(function(){{ alertEl.remove() }}, {timeout});
+            }}
+            """
+            ),
         )
     )
     # )
