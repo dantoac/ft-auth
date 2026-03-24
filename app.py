@@ -129,8 +129,12 @@ def user_update_form(session):
     """
     return Form(
         H2(
-            f"Actualizando datos de {session['auth']['email']}",
+            "Cambiar contraseña",
             _class="text-xl font-bold mb-4",
+        ),
+        P(
+            session["auth"]["email"],
+            _class="text-sm text-base-content/60 -mt-3 mb-2",
         ),
         Div(
             Input(
@@ -284,6 +288,7 @@ def login_form():
                 _class="btn btn-primary w-full mt-4",
                 _type="submit",
                 _hx_post=login_post,
+                _hx_disabled_elt="this",
             ),
             _class="flex flex-col items-center gap-4 p-8 bg-base-200 rounded-lg shadow-inner shadow-base-content/20",
             _hx_swap="outerHTML",
@@ -300,10 +305,13 @@ def login(session, resource: str = ""):
 
     UX-07: Solo limpia claves de autenticación, preserva tenant_uuid y
     otras claves de sesión no relacionadas con auth.
+    UX-22: Muestra el flash de registro exitoso si existe y luego lo borra.
     """
     for key in ["auth", "user_id", "user_uuid", "email"]:
         session.pop(key, None)
-    return user_template(login_form())
+    flash = session.pop("flash", None)
+    extra = ergonoti(message=flash, type="success") if flash else None
+    return user_template(login_form(), extra=extra)
 
 
 def register_form(username: str = "", email: str = ""):
@@ -413,6 +421,7 @@ def register_form(username: str = "", email: str = ""):
                 _class="btn btn-primary w-full mt-4",
                 _type="submit",
                 _hx_post=register_user,
+                _hx_disabled_elt="this",
             ),
             _class="flex flex-col items-center gap-4 p-8 bg-base-200 rounded-lg shadow-inner shadow-base-content/20",
             _hx_swap="outerHTML",
@@ -431,6 +440,7 @@ def register():
 
 @rt.post("/register")
 def register_user(
+    session,
     username: str = "",
     email: str = "",
     password: str = "",
@@ -503,6 +513,7 @@ def register_user(
             ),
             register_form(username=username, email=email),
         )
+    session["flash"] = "Registro exitoso. Por favor inicia sesión."
     return Redirect(ROUTE_AFTER_REGISTER)
 
 
@@ -639,10 +650,16 @@ def user_update(
         )
 
 
-def user_template(content):
+def user_template(content, extra=None):
+    """Plantilla base para páginas de autenticación.
+
+    UX-15: aria_live="polite" para que lectores de pantalla anuncien notificaciones.
+    UX-22: Acepta `extra` para inyectar notificaciones previas al render
+    (ej. flash de registro exitoso).
+    """
     return Div(
-        # UX-15: aria_live="polite" para que lectores de pantalla anuncien notificaciones
         Div(
+            extra,
             _id="notifications",
             _class="toast toast-top z-50",
             _aria_live="polite",
