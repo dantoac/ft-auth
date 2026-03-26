@@ -285,6 +285,22 @@ def login_form():
                 _type="submit",
                 _hx_post=login_post,
             ),
+            Div(
+                Div(_class="divider text-xs text-base-content/50 my-2"),
+                A(
+                    Img(
+                        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+                        alt="Google",
+                        width="20",
+                        height="20",
+                        _class="mr-2",
+                    ),
+                    "Continuar con Google",
+                    href="/auth/oauth/google/authorize",
+                    _class="btn btn-outline w-full max-w-xs",
+                ),
+                _class="flex flex-col items-center w-full mt-2",
+            ),
             _class="flex flex-col items-center gap-4 p-8 bg-base-200 rounded-lg shadow-inner shadow-base-content/20",
             _hx_swap="outerHTML",
             _hx_target="#login-form",
@@ -534,6 +550,16 @@ def login_post(request, session, email: str, password: str, important: str = "")
 
     else:
         existing_user = _get_user_by_email(email)
+
+        if existing_user and not existing_user.password_hash:
+            # Usuario SSO sin contraseña local
+            return (
+                ergonoti(
+                    message="Esta cuenta usa Google. Inicia sesión con Google.",
+                    type="warning",
+                ),
+                login_form(),
+            )
 
         if existing_user and _verify_password(password, existing_user.password_hash):
             session["auth"] = {

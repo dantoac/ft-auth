@@ -29,8 +29,19 @@ class AuthUser(BaseModel):
     id: int
     username: str
     email: str
-    password_hash: str
+    password_hash: str | None
     last_login: int | None  # Unix timestamp
+
+
+class AuthIdentity(BaseModel):
+    """Identidad OAuth externa vinculada a un usuario."""
+
+    id: int
+    auth_user_id: int
+    provider: str
+    external_id: str
+    external_email: str | None
+    external_name: str | None
 
 
 class AuthGroup(BaseModel):
@@ -63,11 +74,23 @@ def create_auth_tables():
     auth_users = db.create(
         AuthUser,
         transform=True,
-        not_null={"email", "password_hash"},
+        not_null={"email"},
         defaults={"is_active": True},
     )
 
     auth_users.create_index(["email"], unique=True, if_not_exists=True)
+
+    auth_identities = db.create(
+        AuthIdentity,
+        transform=True,
+        foreign_keys=[("auth_user_id", "auth_user")],
+        not_null={"auth_user_id", "provider", "external_id"},
+        defaults={"is_active": True},
+    )
+
+    auth_identities.create_index(
+        ["provider", "external_id"], unique=True, if_not_exists=True
+    )
 
     auth_groups = db.create(
         AuthGroup,
@@ -85,7 +108,9 @@ def create_auth_tables():
         not_null={"auth_user_id", "auth_group_id"},
     )
 
-    auth_memberships.create_index(["auth_user_id", "auth_group_id"], unique=True, if_not_exists=True)
+    auth_memberships.create_index(
+        ["auth_user_id", "auth_group_id"], unique=True, if_not_exists=True
+    )
 
     auth_permissions = db.create(
         AuthPermissions,
@@ -95,7 +120,9 @@ def create_auth_tables():
         transform=True,
     )
 
-    auth_permissions.create_index(["name", "auth_user_id", "resource"], unique=True, if_not_exists=True)
+    auth_permissions.create_index(
+        ["name", "auth_user_id", "resource"], unique=True, if_not_exists=True
+    )
 
     return auth_users, auth_groups, auth_memberships, auth_permissions
 
